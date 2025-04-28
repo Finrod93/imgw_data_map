@@ -1,1 +1,0 @@
-# imgw_data_map

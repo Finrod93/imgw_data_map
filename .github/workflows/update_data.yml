@@ -33,6 +33,19 @@ jobs:
       run: |
         git config --global user.name "IMGW Data Bot"
         git config --global user.email "actions@github.com"
-        git add imgw_data.geojson
-        git diff-index --quiet HEAD || git commit -m "Aktualizacja danych IMGW: $(date +'%Y-%m-%d %H:%M')"
-        git push
+        
+        # Sprawdzenie, czy plik geojson w ogóle zosta³ utworzony przez skrypt
+        if [ -f "imgw_data.geojson" ]; then
+          git add imgw_data.geojson
+          
+          # Bezpieczne sprawdzenie czy s¹ zmiany przed zrobieniem commit i push
+          if ! git diff --cached --quiet; then
+            git commit -m "Aktualizacja danych IMGW: $(date +'%Y-%m-%d %H:%M')"
+            git push origin main
+          else
+            echo "Brak nowych zmian w danych."
+          fi
+        else
+          echo "B£¥D KRYTYCZNY: Plik imgw_data.geojson nie zosta³ utworzony przez skrypt Pythona!"
+          exit 1
+        fi

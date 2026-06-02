@@ -2,8 +2,11 @@ name: Hourly IMGW Data Update
 
 on:
   schedule:
-    - cron: '5 * * * *'  # Odpala siÄ™ automatycznie 5 minut po kaÅ¼dej peÅ‚nej godzinie
-  workflow_dispatch:     # Pozwala teÅ¼ uruchomiÄ‡ skrypt rÄ™cznie jednym klikniÄ™ciem
+    - cron: '15 * * * *'  # Odpala siê automatycznie 15 minut po ka¿dej pe³nej godzinie
+  workflow_dispatch:     # Pozwala te¿ uruchomiæ skrypt rêcznie jednym klikniêciem
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true  # Wymuszenie Node.js 24 dla wszystkich akcji
 
 jobs:
   update-data:
@@ -23,7 +26,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Uruchomienie skryptu pobierajÄ…cego dane IMGW
+    - name: Uruchomienie skryptu pobieraj¹cego dane IMGW
       run: python imgw_data.py
 
     - name: Automatyczny zapis zaktualizowanych danych do repozytorium

@@ -1,0 +1,6 @@
+aiohttp
+pandas
+openpyxl
+requests
+python-dateutil
+tqdm

@@ -8,7 +8,6 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     
     <style>
-        /* Pełnoekranowy widok mapy */
         html, body {
             margin: 0;
             padding: 0;
@@ -21,71 +20,52 @@
             width: 100%;
         }
         
-        /* BAZOWY STYL ETYKIET: Ciasne, małe prostokąty z idealnie wyśrodkowaną czcionką 11px */
+        /* BAZOWY STYL ETYKIET */
         .stacja-etykieta {
-            background: rgba(255, 255, 255, 0.95) !important;
+            background: none !important; 
             border-radius: 2px !important;
             box-shadow: 0 1px 2px rgba(0,0,0,0.15) !important;
             font-family: Arial, sans-serif !important;
             font-size: 11px !important;
-            font-weight: bold !important;
+            font-weight: bold !important; 
             white-space: nowrap !important;
-            
-            /* Gwarancja doskonałego pozycjonowania w osiach X i Y */
             display: inline-flex !important;
             align-items: center !important;
             justify-content: center !important;
             text-align: center !important;
-            
-            /* Maksymalne odchudzenie ramek prostokąta */
             line-height: normal !important;
-            padding: 0px 2px !important; 
+            padding: 0 !important; 
+            border: none !important; 
         }
 
-        /* PRECYZYJNE ZBLIŻENIE DO PUNKTÓW */
-        /* Klasa dla etykiet wyświetlanych NAD punktem stacji */
-        .etykieta-gora {
-            margin-top: -5px !important; 
+        .etykieta-gora { margin-top: -5px !important; }
+        .etykieta-dol { margin-top: 5px !important; }
+
+        /* KOLOROWE RAMKI DLA EKSTREMÓW */
+        .ramka-max {
+            border: 2px solid #ff0000 !important;
+        }
+        .ramka-min {
+            border: 2px solid #0000ff !important;
         }
 
-        /* Klasa dla etykiet wyświetlanych POD punktem stacji */
-        .etykieta-dol {
-            margin-top: 5px !important; 
+        /* CZARNY TEKST DLA DANYCH BEZ CIENI I PODKREŚLEŃ */
+        .stacja-etykieta,
+        .temp-aktualna, .temp-min, .temp-min-hour, .temp-max, .temp-max-hour, .temp-grunt,
+        .opad-dobowy, .opad-10min, .wiatr-avg, .wiatr-max, .wysokosc, .nazwa-stacji { 
+            color: #000000 !important;
+            text-shadow: none !important;
+            text-decoration: none !important;
         }
 
-        /* DYNAMICZNE KOLOROWANIE RAMKI ORAZ CZCIONKI WEDŁUG WYMAGAŃ */
-        
-        /* Tmax oraz Tmax_hour: Czerwona obwódka, tekst czarny */
-        .temp-max, .temp-max-hour { 
-            color: #000000 !important; 
-            border: 1px solid #ea2027 !important; 
-        }
-        /* WYJĄTEK: Tylko najwyższa wartość Tmax / Tmax_hour w kraju otrzymuje czerwony tekst */
-        .temp-max.najwyzsza-temp, .temp-max-hour.najwyzsza-temp { 
-            color: #ea2027 !important; 
-        }
+        /* Standardowe parametry */
+        .opad-dobowy { background: rgba(255, 255, 255, 0.95) !important; border: 1px solid #4cd137 !important; padding: 0px 2px !important;}
+        .opad-10min { background: rgba(255, 255, 255, 0.95) !important; border: 1px solid #a3cb38 !important; padding: 0px 2px !important;}
+        .wiatr-avg { background: rgba(255, 255, 255, 0.95) !important; border: 1px solid #9980fa !important; padding: 0px 2px !important;}
+        .wiatr-max { background: rgba(255, 255, 255, 0.95) !important; border: 1px solid #52307c !important; padding: 0px 2px !important;}
+        .wysokosc { background: rgba(255, 255, 255, 0.95) !important; border: 1px solid #8d6e63 !important; padding: 0px 2px !important;}
+        .nazwa-stacji { background: rgba(255, 255, 255, 0.95) !important; border: 1px solid #b2bec3 !important; padding: 0px 2px !important;}
 
-        /* Tmin oraz Tmin_hour: Niebieska obwódka, tekst czarny */
-        .temp-min, .temp-min-hour { 
-            color: #000000 !important; 
-            border: 1px solid #0652dd !important; 
-        }
-        /* WYJĄTEK: Tylko najniższa wartość Tmin / Tmin_hour w kraju otrzymuje niebieski tekst */
-        .temp-min.najnizsza-temp, .temp-min-hour.najnizsza-temp { 
-            color: #0652dd !important; 
-        }
-
-        /* Standardowe, cienkie obramowania dla pozostałych warstw */
-        .temp-aktualna { color: #2c3e50; border: 1px solid #7f8c8d !important; }
-        .temp-grunt { color: #6f1e51; border: 1px solid #9980fa !important; }
-        .opad-dobowy { color: #1b8d4b; border: 1px solid #4cd137 !important; }
-        .opad-10min { color: #009432; border: 1px solid #a3cb38 !important; }
-        .wiatr-avg { color: #5758bb; border: 1px solid #9980fa !important; }
-        .wiatr-max { color: #3c1361; border: 1px solid #52307c !important; }
-        .wysokosc { color: #5d4037; border: 1px solid #8d6e63 !important; }
-        .nazwa-stacji { color: #212121; border: 1px solid #b2bec3 !important; }
-
-        /* Całkowite usunięcie strzałek / trójkątów pod etykietami */
         .leaflet-tooltip-top::before, 
         .leaflet-tooltip-bottom::before, 
         .leaflet-tooltip-left::before, 
@@ -93,7 +73,6 @@
             display: none !important;
         }
 
-        /* Styl dla czystego separatora i nagłówka sekcji w menu warstw */
         .leaflet-control-layers-separator {
             border-top: 1px solid #ddd;
             margin: 5px -10px 5px -10px;
@@ -103,6 +82,79 @@
             color: #555;
             font-weight: bold;
             padding: 2px 0;
+        }
+
+        /* SUWAK PRZEZROCZYSTOŚCI */
+        .slider-opacity-container {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 8px 12px;
+            border-radius: 4px;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+            font-size: 12px;
+            font-weight: bold;
+            color: #333;
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            min-width: 150px;
+        }
+        .slider-opacity-container input[type=range] {
+            cursor: pointer;
+            width: 100%;
+            margin: 0;
+        }
+
+        /* PIONOWA LEGENDA */
+        .map-legend-container {
+            background: rgba(255, 255, 255, 0.92);
+            padding: 10px 14px;
+            border-radius: 5px;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.25);
+            font-family: Arial, sans-serif;
+            color: #2c3e50;
+            min-width: 90px;
+        }
+        .legend-title {
+            font-size: 11px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 4px;
+        }
+        .legend-body {
+            display: flex;
+            flex-direction: row;
+            height: 340px; 
+        }
+        .legend-bar {
+            width: 14px;
+            height: 100%;
+            border: 1px solid #444;
+            border-radius: 2px;
+        }
+        .legend-labels {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between; 
+            height: 100%;
+            margin-left: 4px;
+        }
+        .legend-label-row {
+            display: flex;
+            align-items: center;
+            height: 12px;
+            line-height: 12px;
+        }
+        .legend-tick {
+            font-size: 10px;
+            color: #7f8c8d;
+            margin-right: 2px;
+        }
+        .legend-value {
+            font-size: 10px;
+            font-weight: bold;
         }
     </style>
 </head>

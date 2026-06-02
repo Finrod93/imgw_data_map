@@ -1,0 +1,35 @@
+name: Hourly IMGW Data Update
+
+on:
+  schedule:
+    - cron: '5 * * * *'  # Odpala się automatycznie 5 minut po każdej pełnej godzinie
+  workflow_dispatch:     # Pozwala też uruchomić skrypt ręcznie jednym kliknięciem
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Sprawdzenie kodu repozytorium
+      uses: actions/checkout@v4
+
+    - name: Konfiguracja Pythona
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Instalacja wymaganych bibliotek
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Uruchomienie skryptu pobierającego dane IMGW
+      run: python imgw_data.py
+
+    - name: Automatyczny zapis zaktualizowanych danych do repozytorium
+      run: |
+        git config --global user.name "IMGW Data Bot"
+        git config --global user.email "actions@github.com"
+        git add imgw_data.geojson
+        git diff-index --quiet HEAD || git commit -m "Aktualizacja danych IMGW: $(date +'%Y-%m-%d %H:%M')"
+        git push

@@ -3,94 +3,158 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Automatyczna Mapa Pogodowa IMGW</title>
+    <title>Stacje Meteorologiczne IMGW - Panel Kontrolny</title>
     
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     
     <style>
-        html, body, #map {
+        html, body {
             margin: 0;
             padding: 0;
-            width: 100%;
             height: 100%;
-            font-family: 'Helvetica Neue', Arial, Helvetica, sans-serif;
-            background-color: #b5d0d0;
+            width: 100%;
+            font-family: Arial, sans-serif;
         }
-
-        /* 🎨 Profesjonalna legenda GIS dla temperatur */
-        .info.legend {
-            background: rgba(255, 255, 255, 0.96);
-            padding: 10px 14px;
-            font-size: 11px;
-            line-height: 13px;
-            color: #222;
-            border-radius: 6px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-            font-weight: 600;
-            border: 1px solid #cbd5e1;
-            max-height: 65vh;
-            overflow-y: auto;
+        #map {
+            height: 100%;
+            width: 100%;
         }
         
-        .info.legend h4 {
-            margin: 0 0 6px 0;
+        /* BAZOWY STYL ETYKIET */
+        .stacja-etykieta {
+            background: none !important; 
+            border-radius: 2px !important;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.15) !important;
+            font-family: Arial, sans-serif !important;
+            font-size: 11px !important;
+            font-weight: bold !important; 
+            white-space: nowrap !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            text-align: center !important;
+            line-height: normal !important;
+            padding: 0 !important; 
+            border: none !important; 
+        }
+
+        .etykieta-gora { margin-top: -5px !important; }
+        .etykieta-dol { margin-top: 5px !important; }
+
+        /* KOLOROWE RAMKI DLA EKSTREMÓW */
+        .ramka-max {
+            border: 2px solid #ff0000 !important;
+        }
+        .ramka-min {
+            border: 2px solid #0000ff !important;
+        }
+
+        /* CZARNY TEKST DLA DANYCH BEZ CIENI I PODKREŚLEŃ */
+        .stacja-etykieta,
+        .temp-aktualna, .temp-min, .temp-min-hour, .temp-max, .temp-max-hour, .temp-grunt,
+        .opad-dobowy, .opad-10min, .wiatr-avg, .wiatr-max, .wysokosc, .nazwa-stacji { 
+            color: #000000 !important;
+            text-shadow: none !important;
+            text-decoration: none !important;
+        }
+
+        /* Standardowe parametry */
+        .opad-dobowy { background: rgba(255, 255, 255, 0.95) !important; border: 1px solid #4cd137 !important; padding: 0px 2px !important;}
+        .opad-10min { background: rgba(255, 255, 255, 0.95) !important; border: 1px solid #a3cb38 !important; padding: 0px 2px !important;}
+        .wiatr-avg { background: rgba(255, 255, 255, 0.95) !important; border: 1px solid #9980fa !important; padding: 0px 2px !important;}
+        .wiatr-max { background: rgba(255, 255, 255, 0.95) !important; border: 1px solid #52307c !important; padding: 0px 2px !important;}
+        .wysokosc { background: rgba(255, 255, 255, 0.95) !important; border: 1px solid #8d6e63 !important; padding: 0px 2px !important;}
+        .nazwa-stacji { background: rgba(255, 255, 255, 0.95) !important; border: 1px solid #b2bec3 !important; padding: 0px 2px !important;}
+
+        .leaflet-tooltip-top::before, 
+        .leaflet-tooltip-bottom::before, 
+        .leaflet-tooltip-left::before, 
+        .leaflet-tooltip-right::before {
+            display: none !important;
+        }
+
+        .leaflet-control-layers-separator {
+            border-top: 1px solid #ddd;
+            margin: 5px -10px 5px -10px;
+        }
+        .leaflet-menu-section-title {
+            font-size: 11px;
+            color: #555;
+            font-weight: bold;
+            padding: 2px 0;
+        }
+
+        /* SUWAK PRZEZROCZYSTOŚCI */
+        .slider-opacity-container {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 8px 12px;
+            border-radius: 4px;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.4);
             font-size: 12px;
             font-weight: bold;
-            border-bottom: 1.5px solid #e2e8f0;
-            padding-bottom: 4px;
-            text-align: center;
-        }
-
-        .legend-row {
+            color: #333;
+            margin-top: 10px;
             display: flex;
-            align-items: center;
-            margin-bottom: 1px;
+            flex-direction: column;
+            gap: 5px;
+            min-width: 150px;
+        }
+        .slider-opacity-container input[type=range] {
+            cursor: pointer;
+            width: 100%;
+            margin: 0;
         }
 
-        .legend-color-box {
-            width: 16px;
-            height: 11px;
-            margin-right: 8px;
-            border: 1px solid rgba(0,0,0,0.15);
-            border-radius: 2px;
+        /* PIONOWA LEGENDA */
+        .map-legend-container {
+            background: rgba(255, 255, 255, 0.92);
+            padding: 10px 14px;
+            border-radius: 5px;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.25);
+            font-family: Arial, sans-serif;
+            color: #2c3e50;
+            min-width: 90px;
         }
-
-        /* 🏷️ Oryginalne etykiety prostokątne GIS */
-        .gis-rect-label {
-            background: none !important;
-            border: none !important;
-        }
-
-        .gis-rect-box {
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        .legend-title {
             font-size: 11px;
             font-weight: bold;
-            color: #000000;
-            padding: 1px 4px;
-            border-radius: 3px;
-            border: 1.2px solid #222222;
-            box-shadow: 0 1.5px 3px rgba(0,0,0,0.3);
             text-align: center;
-            white-space: nowrap;
-            min-width: 38px;
-            height: 17px;
-            box-sizing: border-box;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 4px;
         }
-
-        .meteo-popup-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 11px;
-            margin-top: 5px;
+        .legend-body {
+            display: flex;
+            flex-direction: row;
+            height: 340px; 
         }
-        .meteo-popup-table td {
-            padding: 2px 4px;
-            border-bottom: 1px solid #f1f5f9;
+        .legend-bar {
+            width: 14px;
+            height: 100%;
+            border: 1px solid #444;
+            border-radius: 2px;
         }
-        .meteo-popup-table tr:last-child td {
-            border-bottom: none;
+        .legend-labels {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between; 
+            height: 100%;
+            margin-left: 4px;
+        }
+        .legend-label-row {
+            display: flex;
+            align-items: center;
+            height: 12px;
+            line-height: 12px;
+        }
+        .legend-tick {
+            font-size: 10px;
+            color: #7f8c8d;
+            margin-right: 2px;
+        }
+        .legend-value {
+            font-size: 10px;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -98,7 +162,8 @@
 
     <div id="map"></div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="app.js?v=2.0"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <script src="app.js"></script>
 </body>
 </html>

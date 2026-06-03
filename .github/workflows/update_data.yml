@@ -2,8 +2,8 @@ name: Hourly IMGW Data Update
 
 on:
   schedule:
-    # Odpala siê 15, 30 ORAZ 45 minut po ka¿dej pe³nej godzinie
-    - cron: '15,30,45 * * * *'  
+    # Odpala siê 15 ORAZ 45 minut po ka¿dej pe³nej godzinie (wiêksza szansa na punktualnoœæ)
+    - cron: '15,45 * * * *'  
   workflow_dispatch:     # Pozwala te¿ uruchomiæ skrypt rêcznie jednym klikniêciem
 
 env:
@@ -25,7 +25,7 @@ jobs:
     - name: Instalacja wymaganych bibliotek
       run: |
         python -m pip install --upgrade pip
-        pip install pandas openpyxl requests aiohttp tqdm python-dateutil tzdata
+        pip install -r requirements.txt
 
     - name: Uruchomienie skryptu bazy danych IMGW
       run: python imgw_data.py
@@ -40,10 +40,10 @@ jobs:
           if ! git diff --cached --quiet; then
             git commit -m "Aktualizacja bazy godzinowej IMGW: $(date +'%Y-%m-%d %H:%M')"
             git push origin main
-            echo "Sukces: Baza danych zosta³a zaktualizowana."
           else
-            echo "Brak nowych danych do zapisania (dane identyczne)."
+            echo "Brak nowych danych do zapisania."
           fi
         else
-          echo "UWAGA: Plik imgw_baza.json nie powsta³ w tym przebiegu (prawdopodobnie chwilowa przerwa w API IMGW). Pomijam krok zapisu."
+          echo "B£¥D: Plik imgw_baza.json nie powsta³ podczas dzia³ania skryptu Pythona."
+          exit 1
         fi

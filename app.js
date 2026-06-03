@@ -41,7 +41,7 @@ function getTempColor(t) {
 
 // Funkcja określająca kolor dla opadu
 function getPrecipColor(p) {
-    if (p === null || p === undefined || p === 0) return '#ffffff00'; // przezroczysty dla braku opadu
+    if (p === null || p === undefined || p === 0) return '#ffffff00';
     return p < 1  ? '#e0f7fa' :
            p < 5  ? '#80deea' :
            p < 15 ? '#26c6da' :
@@ -60,62 +60,67 @@ function wyswietlDaneDlaGodziny(klucz) {
     }
 
     stacje.forEach(stacja => {
-        const coords = stacja.geometry.coordinates;
-        const props = stacja.properties;
-        
-        // Odwracamy współrzędne GeoJSON [lon, lat] na format Leafleta [lat, lon]
-        const latLng = [coords[1], coords[0]];
+        try {
+            if (!stacja.geometry || !stacja.geometry.coordinates) return;
+            const coords = stacja.geometry.coordinates;
+            const props = stacja.properties;
+            
+            // Odwracamy współrzędne GeoJSON [lon, lat] na format Leafleta [lat, lon]
+            const latLng = [coords[1], coords[0]];
 
-        // 1. Warstwa: Temperatura powietrza (Ta)
-        if (props.Ta !== undefined && props.Ta !== null) {
-            L.circleMarker(latLng, {
-                radius: 8,
-                fillColor: getTempColor(props.Ta),
-                color: '#000',
-                weight: 1,
-                opacity: 1,
-                fillOpacity: 0.8
-            }).bindPopup(`<b>${props.Station_name}</b><br>Temperatura: ${props.Ta}°C`)
-              .addTo(layers.temperature);
-        }
+            // 1. Warstwa: Temperatura powietrza (Ta)
+            if (props.Ta !== undefined && props.Ta !== null) {
+                L.circleMarker(latLng, {
+                    radius: 8,
+                    fillColor: getTempColor(props.Ta),
+                    color: '#000',
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                }).bindPopup(`<b>${props.Station_name || 'Stacja meteo'}</b><br>Temperatura: ${props.Ta}°C`)
+                  .addTo(layers.temperature);
+            }
 
-        // 2. Warstwa: Temperatura gruntu (Tg)
-        if (props.Tg !== undefined && props.Tg !== null) {
-            L.circleMarker(latLng, {
-                radius: 8,
-                fillColor: getTempColor(props.Tg),
-                color: '#8b4513',
-                weight: 1,
-                opacity: 1,
-                fillOpacity: 0.8
-            }).bindPopup(`<b>${props.Station_name}</b><br>Temp. gruntu: ${props.Tg}°C`)
-              .addTo(layers.ground_temp);
-        }
+            // 2. Warstwa: Temperatura gruntu (Tg)
+            if (props.Tg !== undefined && props.Tg !== null) {
+                L.circleMarker(latLng, {
+                    radius: 8,
+                    fillColor: getTempColor(props.Tg),
+                    color: '#8b4513',
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                }).bindPopup(`<b>${props.Station_name || 'Stacja meteo'}</b><br>Temp. gruntu: ${props.Tg}°C`)
+                  .addTo(layers.ground_temp);
+            }
 
-        // 3. Warstwa: Wiatr (Wind_avg)
-        if (props.Wind_avg !== undefined && props.Wind_avg !== null) {
-            L.circleMarker(latLng, {
-                radius: 6,
-                fillColor: '#87ceeb',
-                color: '#4682b4',
-                weight: 1,
-                opacity: 1,
-                fillOpacity: 0.7
-            }).bindPopup(`<b>${props.Station_name}</b><br>Wiatr średni: ${props.Wind_avg} m/s<br>Wiatr max: ${props.Wind_max || 'brak'} m/s`)
-              .addTo(layers.wind);
-        }
+            // 3. Warstwa: Wiatr (Wind_avg)
+            if (props.Wind_avg !== undefined && props.Wind_avg !== null) {
+                L.circleMarker(latLng, {
+                    radius: 6,
+                    fillColor: '#87ceeb',
+                    color: '#4682b4',
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.7
+                }).bindPopup(`<b>${props.Station_name || 'Stacja meteo'}</b><br>Wiatr średni: ${props.Wind_avg} m/s<br>Wiatr max: ${props.Wind_max || 'brak'} m/s`)
+                  .addTo(layers.wind);
+            }
 
-        // 4. Warstwa: Opad (Precip_24h)
-        if (props.Precip_24h !== undefined && props.Precip_24h !== null && props.Precip_24h > 0) {
-            L.circleMarker(latLng, {
-                radius: 7,
-                fillColor: getPrecipColor(props.Precip_24h),
-                color: '#00008b',
-                weight: 1,
-                opacity: 1,
-                fillOpacity: 0.8
-            }).bindPopup(`<b>${props.Station_name}</b><br>Opad 24h: ${props.Precip_24h} mm`)
-              .addTo(layers.precipitation);
+            // 4. Warstwa: Opad (Precip_24h)
+            if (props.Precip_24h !== undefined && props.Precip_24h !== null && props.Precip_24h > 0) {
+                L.circleMarker(latLng, {
+                    radius: 7,
+                    fillColor: getPrecipColor(props.Precip_24h),
+                    color: '#00008b',
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                }).bindPopup(`<b>${props.Station_name || 'Stacja meteo'}</b><br>Opad 24h: ${props.Precip_24h} mm`)
+                  .addTo(layers.precipitation);
+            }
+        } catch (e) {
+            console.error("Błąd podczas rysowania pojedynczej stacji: ", e);
         }
     });
 }
@@ -127,10 +132,18 @@ function dodajLegende() {
         const div = L.DomUtil.create('div', 'info legend');
         const grades = [-15, -10, 0, 5, 15, 25];
         div.innerHTML = '<h4>Temperatura (°C)</h4>';
+        
         for (let i = 0; i < grades.length; i++) {
-            div.innerHTML +=
-                '<i style="background:' + getTempColor(grades[i] + 1) + '; width: 18px; height: 18px; float: left; margin-right: 8px; opacity: 0.8;"></i> ' +
-                grades[i] + (grades[i + 1] ? ' do ' + grades[i + 1] + '<br>' : '+');
+            const color = getTempColor(grades[i] + 1);
+            const labelText = grades[i] + (grades[i + 1] !== undefined ? ' do ' + grades[i + 1] : '+');
+            
+            div.innerHTML += `
+                <div>
+                    <div class="legend-color-box" style="background: ${color};"></div>
+                    <span>${labelText}</span>
+                </div>
+                <div style="clear: both;"></div>
+            `;
         }
         return div;
     };
@@ -147,28 +160,22 @@ function ustawSuwakCzasu() {
         return;
     }
 
-    // Ustawienia suwaka: od 0 do liczby dostępnych godzin minus 1
     slider.min = 0;
     slider.max = dostepneKlucze.length - 1;
     
-    // Ustawiamy suwak na najnowszą godzinę (ostatni element tablicy)
     const najnowszyIndeks = dostepneKlucze.length - 1;
     slider.value = najnowszyIndeks;
 
-    // Formatowanie wyświetlania etykiety nad suwakiem
     function aktualizujEtykiete(indeks) {
         const klucz = dostepneKlucze[indeks];
         if (!klucz) return;
-        // Zamiana "2026-06-03_14" na ładne "2026-06-03 godz. 14:00"
         const czesci = klucz.split('_');
         label.innerText = `${czesci[0]} godz. ${czesci[1]}:00`;
     }
 
-    // Pierwsze uruchomienie dla najnowszych danych
     aktualizujEtykiete(najnowszyIndeks);
     wyswietlDaneDlaGodziny(dostepneKlucze[najnowszyIndeks]);
 
-    // Reakcja na przesuwanie suwaka przez użytkownika
     slider.addEventListener('input', function(e) {
         const indeks = parseInt(e.target.value);
         aktualizujEtykiete(indeks);
@@ -180,29 +187,22 @@ function ustawSuwakCzasu() {
 console.log("Rozpoczynam pobieranie pliku imgw_baza.json...");
 fetch('imgw_baza.json')
     .then(response => {
-        if (!response.ok) {
-            throw new Error(`Nie można wczytać pliku bazy danych (Status: ${response.status})`);
-        }
+        if (!response.ok) throw new Error(`Nie można wczytać bazy danych (Status: ${response.status})`);
         return response.json();
     })
     .then(data => {
         imgwBazaDanych = data;
-        // Sortujemy klucze alfabetycznie/chronologicznie, żeby suwak szedł od najstarszych do najnowszych
         dostepneKlucze = Object.keys(data).sort();
 
         if (dostepneKlucze.length === 0) {
-            console.error("Baza danych imgw_baza.json jest pusta (brak kluczy godzinowych).");
+            console.error("Baza danych imgw_baza.json jest pusta.");
             return;
         }
 
         console.log(`Baza wczytana! Znaleziono ${dostepneKlucze.length} godzin danych.`);
-        
-        // Skoro mamy dane, budujemy elementy interfejsu
         dodajLegende();
         ustawSuwakCzasu();
     })
     .catch(error => {
-        console.error("❌ BŁĄD SKRYPTU JAVASCRIPT:", error);
-        alert("Wystąpił problem z załadowaniem bazy danych pogodowych. Sprawdź konsolę (F12).");
+        console.error("❌ BŁĄD JAVASCRIPT:", error);
     });
-    

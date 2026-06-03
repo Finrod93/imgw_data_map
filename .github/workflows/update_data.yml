@@ -2,9 +2,8 @@ name: Hourly IMGW Data Update
 
 on:
   schedule:
-    # Odpala siê 15 ORAZ 45 minut po ka¿dej pe³nej godzinie (wiêksza szansa na punktualnoœæ)
     - cron: '15,45 * * * *'  
-  workflow_dispatch:     # Pozwala te¿ uruchomiæ skrypt rêcznie jednym klikniêciem
+  workflow_dispatch:     
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -25,7 +24,7 @@ jobs:
     - name: Instalacja wymaganych bibliotek
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install pandas openpyxl requests aiohttp tqdm python-dateutil tzdata
 
     - name: Uruchomienie skryptu bazy danych IMGW
       run: python imgw_data.py

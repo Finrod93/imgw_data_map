@@ -11,7 +11,7 @@ import requests
 import ast
 import zoneinfo
 
-# 🕒 Ustawienie strefy czasowej dla Polski (wymaga tzdata w requirements.txt)
+# 🕒 Ustawienie strefy czasowej dla Polski
 local_tz = zoneinfo.ZoneInfo("Europe/Warsaw")
 now_local = datetime.now(local_tz)
 
@@ -26,7 +26,14 @@ timestamp_key = f"{year}-{month:02d}-{day:02d}_{hour:02d}"
 url = "https://danepubliczne.imgw.pl/api/data/meteo"
 temperature_url_base = "https://hydro-back.imgw.pl/station/meteo/data?id="
 
-stations_df = pd.read_excel("all_stations.xlsx", dtype={"Station_id": str})
+# 🔒 BEZPIECZNE WCZYTYWANIE EXCELA
+print("Rozpoczynam wczytywanie pliku all_stations.xlsx...")
+try:
+    stations_df = pd.read_excel("all_stations.xlsx", engine="openpyxl", dtype={"Station_id": str})
+    print("Plik Excel wczytany pomyślnie!")
+except Exception as e:
+    print(f"❌ KRYTYCZNY BŁĄD PODCZAS WCZYTYWANIA EXCELA: {e}")
+    raise e
 
 def parse_coordinates(val):
     if pd.isna(val): return None
@@ -119,10 +126,8 @@ async def main():
         else:
             baza = {}
 
-        # Zapisujemy nową godzinę do pliku
         baza[timestamp_key] = features
 
-        # Usuwanie wpisów starszych niż 6 tygodni (42 dni), żeby oszczędzać miejsce
         limit_retencji = now_local - timedelta(days=42)
         for k in list(baza.keys()):
             try:

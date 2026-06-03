@@ -17,57 +17,50 @@
             background-color: #b5d0d0;
         }
 
-        /* 📅 Lekka, minimalistyczna oś czasu z kalendarzem */
+        /* 📅 Minimalistyczna, lekka oś czasu z kalendarzem */
         #timeline-container {
             position: absolute;
-            bottom: 25px;
+            bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            width: auto;
-            min-width: 500px;
-            background: rgba(255, 255, 255, 0.96);
-            color: #111;
-            padding: 8px 16px;
-            border-radius: 6px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            background: rgba(255, 255, 255, 0.95);
+            color: #222;
+            padding: 6px 14px;
+            border-radius: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
             z-index: 1000;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            gap: 15px;
-            font-size: 12px;
-            border: 1px solid #ccc;
-        }
-
-        .timeline-section {
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            gap: 12px;
+            font-size: 11px;
+            border: 1px solid #dbdbdb;
         }
 
         #calendar-picker {
             border: 1px solid #ccc;
-            padding: 3px 6px;
+            padding: 2px 5px;
             border-radius: 4px;
             font-family: inherit;
             cursor: pointer;
             background: #fff;
+            font-size: 11px;
+            outline: none;
         }
 
         #hour-slider {
-            width: 120px;
+            width: 100px;
             cursor: pointer;
-            accent-color: #222;
+            accent-color: #333;
+            margin: 0;
         }
 
         #current-time-label {
             font-weight: bold;
             font-variant-numeric: tabular-nums;
-            background: #e2e8f0;
+            background: #f1f5f9;
             padding: 2px 6px;
             border-radius: 4px;
-            min-width: 42px;
-            text-align: center;
+            border: 1px solid #e2e8f0;
         }
 
         .source-attribution {
@@ -75,67 +68,68 @@
             color: #666;
             border-left: 1px solid #ccc;
             padding-left: 10px;
-            white-space: nowrap;
+            font-weight: bold;
         }
 
-        /* 🎚️ Panel przezroczystości podkładu z procentami */
+        /* 🎚️ Panel przezroczystości podkładu */
         .opacity-control-panel {
-            background: rgba(255, 255, 255, 0.96);
-            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 6px 10px;
             border-radius: 6px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             font-size: 11px;
             font-weight: bold;
             color: #222;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             border: 1px solid #ccc;
         }
+        
         .opacity-control-panel input {
             cursor: pointer;
-            accent-color: #222;
-            width: 80px;
+            accent-color: #333;
+            width: 70px;
+            margin: 0;
         }
 
         /* 🎨 Odwrócona pionowa legenda termiczna */
         .info.legend {
-            background: rgba(255, 255, 255, 0.96);
-            padding: 10px 14px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 8px 12px;
             font-size: 11px;
-            line-height: 16px;
+            line-height: 15px;
             color: #222;
             border-radius: 6px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             font-weight: 600;
             border: 1px solid #ccc;
         }
         
         .info.legend h4 {
-            margin: 0 0 6px 0;
-            font-size: 12px;
+            margin: 0 0 4px 0;
+            font-size: 11px;
             font-weight: bold;
-            border-bottom: 1.5px solid #ddd;
-            padding-bottom: 3px;
-            color: #000;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 2px;
             text-align: center;
         }
 
         .legend-row {
             display: flex;
             align-items: center;
-            margin-bottom: 2px;
+            margin-bottom: 1px;
         }
 
         .legend-color-box {
-            width: 16px;
-            height: 13px;
-            margin-right: 8px;
+            width: 14px;
+            height: 12px;
+            margin-right: 6px;
             border: 1px solid rgba(0,0,0,0.15);
             border-radius: 2px;
         }
 
-        /* 🏷️ Oryginalne etykiety Felt/QGIS zawieszone bezpośrednio nad punktami */
+        /* 🏷️ Klasy etykiet zawieszonych NAD kropkami */
         .gis-rect-label {
             background: none !important;
             border: none !important;
@@ -148,38 +142,38 @@
             font-size: 11px;
             font-weight: bold;
             color: #000000;
-            padding: 2px 4px;
+            padding: 1px 4px;
             border-radius: 3px;
             border: 1.2px solid #222222;
-            box-shadow: 0 1.5px 4px rgba(0,0,0,0.35);
+            box-shadow: 0 1.5px 3px rgba(0,0,0,0.3);
             text-align: center;
             white-space: nowrap;
             min-width: 38px;
-            height: 18px;
+            height: 17px;
             box-sizing: border-box;
         }
 
-        /* 🟥/🟦 Grube ramki wyróżniające dla ekstremów krajowych danej godziny */
+        /* 🟥/🟦 Obramowania dla rekordów krajowych (wartości max/min) */
         .gis-rect-box.extreme-max {
-            border: 2.5px solid #d32f2f !important;
-            box-shadow: 0 0 6px rgba(211, 47, 47, 0.8);
+            border: 2.2px solid #d32f2f !important;
+            box-shadow: 0 0 5px rgba(211, 47, 47, 0.7);
         }
 
         .gis-rect-box.extreme-min {
-            border: 2.5px solid #1976d2 !important;
-            box-shadow: 0 0 6px rgba(25, 118, 210, 0.8);
+            border: 2.2px solid #1976d2 !important;
+            box-shadow: 0 0 5px rgba(25, 118, 210, 0.7);
         }
 
-        /* Tabela w popupie stacji */
+        /* Popup stacji */
         .meteo-popup-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 11px;
-            margin-top: 5px;
+            margin-top: 4px;
         }
         .meteo-popup-table td {
             padding: 2px 4px;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid #f1f5f9;
         }
         .meteo-popup-table tr:last-child td {
             border-bottom: none;
@@ -191,18 +185,10 @@
     <div id="map"></div>
 
     <div id="timeline-container">
-        <div class="timeline-section">
-            <label for="calendar-picker"><b>Dzień:</b></label>
-            <input type="date" id="calendar-picker">
-        </div>
-        <div class="timeline-section" style="flex-grow: 1; justify-content: center;">
-            <label for="hour-slider"><b>Godzina:</b></label>
-            <input type="range" id="hour-slider" min="0" max="23" value="12">
-            <span id="current-time-label">12:00</span>
-        </div>
-        <div class="source-attribution">
-            Źródło danych: IMGW-PIB
-        </div>
+        <input type="date" id="calendar-picker">
+        <input type="range" id="hour-slider" min="0" max="23" value="12">
+        <span id="current-time-label">12:00</span>
+        <div class="source-attribution">Źródło danych: IMGW-PIB</div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

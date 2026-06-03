@@ -1,104 +1,208 @@
-const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 });
-const esriSatelite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 });
+// Inicjalizacja mapy Leaflet
+const map = L.map('map').setView([52.0689, 19.4797], 6);
 
-const map = L.map('map', { center: [52.068811, 19.479699], zoom: 6.5, layers: [osmLayer] });
+// Dodanie podkładu mapy (OpenStreetMap)
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+}).addTo(map);
 
-let bazaDanych = null;
-
-const grupyWarstw = {
-    stacjeZamkniete: L.layerGroup(), etykietyTa: L.layerGroup(), etykietyTmin: L.layerGroup(), etykietyTmax: L.layerGroup(),
-    etykietyTg: L.layerGroup(), etykietyOpady24h: L.layerGroup(), etykietyWindAvg: L.layerGroup(),
-    etykietyElevation: L.layerGroup(), etykietyStationName: L.layerGroup()
+// Warstwy dla różnych typów danych
+const layers = {
+    temperature: L.layerGroup(),
+    ground_temp: L.layerGroup(),
+    wind: L.layerGroup(),
+    precipitation: L.layerGroup()
 };
 
-grupyWarstw.etykietyTa.addTo(map);
+// Domyślnie włączamy warstwę temperatury powietrza
+layers.temperature.addTo(map);
 
-function addDataToParamGroup(rawValue, suffix, className, positionClass, latlng, popupContent, group) {
-    if (rawValue === undefined || rawValue === null) return;
-    const formatted = typeof rawValue === 'number' ? rawValue.toFixed(1) : rawValue;
-    const direction = positionClass === 'etykieta-dol' ? 'bottom' : 'top';
-    
-    const marker = L.circleMarker(latlng, { radius: 3, fillColor: '#2ecc71', color: '#000', weight: 1, fillOpacity: 0.8 });
-    marker.bindPopup(popupContent);
+// Przełącznik warstw na mapie
+L.control.layers(null, {
+    "Temperatura powietrza (Ta)": layers.temperature,
+    "Temperatura gruntu (Tg)": layers.ground_temp,
+    "Prędkość wiatru": layers.wind,
+    "Opad atmosferyczny (24h)": layers.precipitation
+}, { collapsed: false }).addTo(map);
 
-    const lbl = L.tooltip({ permanent: true, direction: direction, className: `stacja-etykieta ${className} ${positionClass}` }).setContent(`${formatted}${suffix}`).setLatLng(latlng);
-    group.addLayer(marker);
-    group.addLayer(lbl);
+// Globalne zmienne na dane i strukturę bazy
+let imgwBazaDanych = {};
+let dostepneKlucze = [];
+
+// Funkcja określająca kolor dla temperatury powietrza
+function getTempColor(t) {
+    if (t === null || t === undefined) return '#808080';
+    return t < -10 ? '#00008b' :
+           t < 0   ? '#4169e1' :
+           t < 5   ? '#add8e6' :
+           t < 15  ? '#90ee90' :
+           t < 25  ? '#ffa500' : '#ff4500';
 }
 
-function zaladujDaneDlaWybranejGodziny() {
-    const dataOkreslana = document.getElementById('date-picker').value;
-    const godzinaOkreslana = String(document.getElementById('time-slider').value).padStart(2, '0');
-    document.getElementById('current-time-display').innerText = `${godzinaOkreslana}:00`;
+// Funkcja określająca kolor dla opadu
+function getPrecipColor(p) {
+    if (p === null || p === undefined || p === 0) return '#ffffff00'; // przezroczysty dla braku opadu
+    return p < 1  ? '#e0f7fa' :
+           p < 5  ? '#80deea' :
+           p < 15 ? '#26c6da' :
+           p < 30 ? '#0097a7' : '#006064';
+}
 
-    const kluczCzasowy = `${dataOkreslana}_${godzinaOkreslana}`;
-    
-    // Zawsze czyść mapę, nawet jeśli nie ma danych
-    Object.values(grupyWarstw).forEach(g => g.clearLayers());
+// Funkcja aktualizująca punkty na mapie dla wybranego klucza (RRRR-MM-DD_HH)
+function wyswietlDaneDlaGodziny(klucz) {
+    // Czyszczenie starych punktów ze wszystkich warstw
+    Object.values(layers).forEach(layerGroup => layerGroup.clearLayers());
 
-    // 🔒 ZABEZPIECZENIE: Jeśli nie ma danych, przerwij bez wyrzucania błędu
-    if (!bazaDanych || !bazaDanych[kluczCzasowy] || !Array.isArray(bazaDanych[kluczCzasowy])) {
-        console.warn("Brak danych dla godziny: " + kluczCzasowy);
+    const stacje = imgwBazaDanych[klucz];
+    if (!stacje || stacje.length === 0) {
+        console.warn(`Brak danych dla klucza: ${klucz}`);
         return;
     }
 
-    bazaDanych[kluczCzasowy].forEach(f => {
-        if (!f.geometry || !f.geometry.coordinates) return;
-        const p = f.properties;
-        const latlng = [f.geometry.coordinates[1], f.geometry.coordinates[0]];
-        let popup = `<h3>${p.Station_name || 'Stacja'}</h3><hr><p>ID: ${p.Station_id}</p>`;
+    stacje.forEach(stacja => {
+        const coords = stacja.geometry.coordinates;
+        const props = stacja.properties;
+        
+        // Odwracamy współrzędne GeoJSON [lon, lat] na format Leafleta [lat, lon]
+        const latLng = [coords[1], coords[0]];
 
-        if (p.Status === 'ACTIVE') {
-            addDataToParamGroup(p.Ta, '°C', 'temp-aktualna', 'etykieta-gora', latlng, popup, grupyWarstw.etykietyTa);
-            addDataToParamGroup(p.Tmin_hour, '°C', 'temp-min', 'etykieta-dol', latlng, popup, grupyWarstw.etykietyTmin);
-            addDataToParamGroup(p.Tmax_hour, '°C', 'temp-max', 'etykieta-gora', latlng, popup, grupyWarstw.etykietyTmax);
-            addDataToParamGroup(p.Tg, '°C', 'temp-grunt', 'etykieta-gora', latlng, popup, grupyWarstw.etykietyTg);
-            addDataToParamGroup(p.Wind_avg, ' km/h', 'wiatr-avg', 'etykieta-gora', latlng, popup, grupyWarstw.etykietyWindAvg);
-            addDataToParamGroup(p.Elevation, 'm', 'wysokosc', 'etykieta-gora', latlng, popup, grupyWarstw.etykietyElevation);
-            addDataToParamGroup(p.Station_name, '', 'nazwa-stacji', 'etykieta-gora', latlng, popup, grupyWarstw.etykietyStationName);
-        } else {
-            const mZ = L.circleMarker(latlng, { radius: 3, fillColor: '#e74c3c', color: '#000', weight: 1 }).bindPopup(popup);
-            grupyWarstw.stacjeZamkniete.addLayer(mZ);
+        // 1. Warstwa: Temperatura powietrza (Ta)
+        if (props.Ta !== undefined && props.Ta !== null) {
+            L.circleMarker(latLng, {
+                radius: 8,
+                fillColor: getTempColor(props.Ta),
+                color: '#000',
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 0.8
+            }).bindPopup(`<b>${props.Station_name}</b><br>Temperatura: ${props.Ta}°C`)
+              .addTo(layers.temperature);
+        }
+
+        // 2. Warstwa: Temperatura gruntu (Tg)
+        if (props.Tg !== undefined && props.Tg !== null) {
+            L.circleMarker(latLng, {
+                radius: 8,
+                fillColor: getTempColor(props.Tg),
+                color: '#8b4513',
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 0.8
+            }).bindPopup(`<b>${props.Station_name}</b><br>Temp. gruntu: ${props.Tg}°C`)
+              .addTo(layers.ground_temp);
+        }
+
+        // 3. Warstwa: Wiatr (Wind_avg)
+        if (props.Wind_avg !== undefined && props.Wind_avg !== null) {
+            L.circleMarker(latLng, {
+                radius: 6,
+                fillColor: '#87ceeb',
+                color: '#4682b4',
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 0.7
+            }).bindPopup(`<b>${props.Station_name}</b><br>Wiatr średni: ${props.Wind_avg} m/s<br>Wiatr max: ${props.Wind_max || 'brak'} m/s`)
+              .addTo(layers.wind);
+        }
+
+        // 4. Warstwa: Opad (Precip_24h)
+        if (props.Precip_24h !== undefined && props.Precip_24h !== null && props.Precip_24h > 0) {
+            L.circleMarker(latLng, {
+                radius: 7,
+                fillColor: getPrecipColor(props.Precip_24h),
+                color: '#00008b',
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 0.8
+            }).bindPopup(`<b>${props.Station_name}</b><br>Opad 24h: ${props.Precip_24h} mm`)
+              .addTo(layers.precipitation);
         }
     });
 }
 
-// Ustawienia początkowe kontrolek czasu
-const dzis = new Date().toISOString().split('T')[0];
-document.getElementById('date-picker').value = dzis;
-document.getElementById('date-picker').max = dzis;
+// Dynamiczne tworzenie i dodawanie Legendy do mapy
+function dodajLegende() {
+    const legend = L.control({ position: 'bottomright' });
+    legend.onAdd = function () {
+        const div = L.DomUtil.create('div', 'info legend');
+        const grades = [-15, -10, 0, 5, 15, 25];
+        div.innerHTML = '<h4>Temperatura (°C)</h4>';
+        for (let i = 0; i < grades.length; i++) {
+            div.innerHTML +=
+                '<i style="background:' + getTempColor(grades[i] + 1) + '; width: 18px; height: 18px; float: left; margin-right: 8px; opacity: 0.8;"></i> ' +
+                grades[i] + (grades[i + 1] ? ' do ' + grades[i + 1] + '<br>' : '+');
+        }
+        return div;
+    };
+    legend.addTo(map);
+}
 
-// Domyślnie ustawiamy suwak na JEDNĄ GODZINĘ WSTECZ, żeby zwiększyć szansę na gotowe dane
-let domyslnaGodzina = new Date().getHours() - 1;
-if (domyslnaGodzina < 0) domyslnaGodzina = 23;
-document.getElementById('time-slider').value = domyslnaGodzina;
+// Inicjalizacja suwaka na podstawie kluczy z bazy danych JSON
+function ustawSuwakCzasu() {
+    const slider = document.getElementById('date-picker');
+    const label = document.getElementById('current-time-label');
+    
+    if (!slider || !label) {
+        console.error("Nie znaleziono elementów suwaka w index.html");
+        return;
+    }
 
-const cacheBuster = new Date().getTime();
+    // Ustawienia suwaka: od 0 do liczby dostępnych godzin minus 1
+    slider.min = 0;
+    slider.max = dostepneKlucze.length - 1;
+    
+    // Ustawiamy suwak na najnowszą godzinę (ostatni element tablicy)
+    const najnowszyIndeks = dostepneKlucze.length - 1;
+    slider.value = najnowszyIndeks;
 
-fetch(`imgw_baza.json?t=${cacheBuster}`)
-    .then(r => {
-        if (!r.ok) throw new Error("Nie można pobrać pliku bazy");
-        return r.json();
+    // Formatowanie wyświetlania etykiety nad suwakiem
+    function aktualizujEtykiete(indeks) {
+        const klucz = dostepneKlucze[indeks];
+        if (!klucz) return;
+        // Zamiana "2026-06-03_14" na ładne "2026-06-03 godz. 14:00"
+        const czesci = klucz.split('_');
+        label.innerText = `${czesci[0]} godz. ${czesci[1]}:00`;
+    }
+
+    // Pierwsze uruchomienie dla najnowszych danych
+    aktualizujEtykiete(najnowszyIndeks);
+    wyswietlDaneDlaGodziny(dostepneKlucze[najnowszyIndeks]);
+
+    // Reakcja na przesuwanie suwaka przez użytkownika
+    slider.addEventListener('input', function(e) {
+        const indeks = parseInt(e.target.value);
+        aktualizujEtykiete(indeks);
+        wyswietlDaneDlaGodziny(dostepneKlucze[indeks]);
+    });
+}
+
+// 🌐 GŁÓWNE POBIERANIE BAZY DANYCH JSON
+console.log("Rozpoczynam pobieranie pliku imgw_baza.json...");
+fetch('imgw_baza.json')
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Nie można wczytać pliku bazy danych (Status: ${response.status})`);
+        }
+        return response.json();
     })
     .then(data => {
-        bazaDanych = data;
-        zaladujDaneDlaWybranejGodziny();
+        imgwBazaDanych = data;
+        // Sortujemy klucze alfabetycznie/chronologicznie, żeby suwak szedł od najstarszych do najnowszych
+        dostepneKlucze = Object.keys(data).sort();
 
-        const baseMaps = { "OpenStreetMap": osmLayer, "Satelita": esriSatelite };
-        const overlayMaps = {
-            "Nazwa stacji": grupyWarstw.etykietyStationName, "Wysokość": grupyWarstw.etykietyElevation,
-            "Temperatura aktualna (Ta)": grupyWarstw.etykietyTa, "Temperatura min (Tmin_h)": grupyWarstw.etykietyTmin,
-            "Temperatura max (Tmax_h)": grupyWarstw.etykietyTmax, "Przy gruncie (Tg)": grupyWarstw.etykietyTg,
-            "Średni wiatr": grupyWarstw.etykietyWindAvg, "Zamknięte": grupyWarstw.stacjeZamkniete
-        };
+        if (dostepneKlucze.length === 0) {
+            console.error("Baza danych imgw_baza.json jest pusta (brak kluczy godzinowych).");
+            return;
+        }
 
-        L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
+        console.log(`Baza wczytana! Znaleziono ${dostepneKlucze.length} godzin danych.`);
+        
+        // Skoro mamy dane, budujemy elementy interfejsu
+        dodajLegende();
+        ustawSuwakCzasu();
     })
-    .catch(err => {
-        console.error(err);
-        // Nawet w przypadku błędu ładowania bazy, pozwól zinicjalizować interfejs
-        zaladujDaneDlaWybranejGodziny();
+    .catch(error => {
+        console.error("❌ BŁĄD SKRYPTU JAVASCRIPT:", error);
+        alert("Wystąpił problem z załadowaniem bazy danych pogodowych. Sprawdź konsolę (F12).");
     });
-
-document.getElementById('time-slider').addEventListener('input', zaladujDaneDlaWybranejGodziny);
-document.getElementById('date-picker').addEventListener('change', zaladujDaneDlaWybranejGodziny);
+    

@@ -1,6 +1,7 @@
-aiohttp
 pandas
-openpyxl
 requests
-python-dateutil
+openpyxl
+aiohttp
 tqdm
+python-dateutil
+tzdata

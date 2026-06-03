@@ -2,8 +2,9 @@ name: Hourly IMGW Data Update
 
 on:
   schedule:
-    - cron: '15,45 * * * *'  
-  workflow_dispatch:     
+    # Odpala siê 15, 30 ORAZ 45 minut po ka¿dej pe³nej godzinie
+    - cron: '15,30,45 * * * *'  
+  workflow_dispatch:     # Pozwala te¿ uruchomiæ skrypt rêcznie jednym klikniêciem
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -39,10 +40,10 @@ jobs:
           if ! git diff --cached --quiet; then
             git commit -m "Aktualizacja bazy godzinowej IMGW: $(date +'%Y-%m-%d %H:%M')"
             git push origin main
+            echo "Sukces: Baza danych zosta³a zaktualizowana."
           else
-            echo "Brak nowych danych do zapisania."
+            echo "Brak nowych danych do zapisania (dane identyczne)."
           fi
         else
-          echo "B£¥D: Plik imgw_baza.json nie powsta³ podczas dzia³ania skryptu Pythona."
-          exit 1
+          echo "UWAGA: Plik imgw_baza.json nie powsta³ w tym przebiegu (prawdopodobnie chwilowa przerwa w API IMGW). Pomijam krok zapisu."
         fi

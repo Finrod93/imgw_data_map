@@ -10,6 +10,7 @@ from dateutil import parser
 import requests
 import ast
 import zoneinfo
+import os
 
 # 🕒 Automatyczne pobieranie aktualnej daty w Polsce
 local_tz = zoneinfo.ZoneInfo("Europe/Warsaw")
@@ -28,6 +29,7 @@ def addZero(dataNumber):
         return str(dataNumber)
     else:
         return "0" + str(dataNumber)
+
 przymrozki_url = f"{przymrozki_url_base}{year}-{addZero(month)}-{addZero(day)}"
 
 stations_df = pd.read_excel(
@@ -38,322 +40,328 @@ stations_df = pd.read_excel(
 def parse_coordinates(val):
     if pd.isna(val):
         return None
-    if isinstance(val, (list, tuple)):
-        return list(val)
     try:
-        return list(ast.literal_eval(val))
+        if isinstance(val, str):
+            coords = ast.literal_eval(val)
+            if isinstance(coords, list) and len(coords) == 2:
+                return [float(coords[0]), float(coords[1])]
+        elif isinstance(val, list) and len(val) == 2:
+            return [float(val[0]), float(val[1])]
     except Exception:
-        try:
-            lon, lat = val.split(",")
-            return [float(lon), float(lat)]
-        except Exception:
-            return None
-
-stations_df["Coordinates_parsed"] = stations_df["Coordinates"].apply(parse_coordinates)
-
-stations_map = {
-    row["Station_id"]: {
-        "Station_id": row["Station_id"],
-        "Station_name": None if pd.isna(row["Station_name"]) else row["Station_name"],
-        "coordinates": row["Coordinates_parsed"],
-        "Elevation": None if pd.isna(row["Elevation"]) else row["Elevation"],
-        "Status": row["Status"]
-    }
-    for _, row in stations_df.iterrows()
-}
-
-start_utc = datetime(year=year, month=month, day=day, hour=18, minute=0, second=0, microsecond=0, tzinfo=timezone.utc) - timedelta(days=1)
-now = datetime.now(timezone.utc)
-end_utc = start_utc + timedelta(days=1)
-hours_interval = math.ceil((now - start_utc).total_seconds() / 3600)
-
-async def fetch_przymrozki_json(url):
-    try:
-        response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
-        return json.loads(response.content.decode('ISO-8859-1')) if response.status_code == 200 else None
-    except Exception:
-        return None
-
-class ExtractedTemps:
-    def __init__(self, temp_current=None, temp_current_time=None, temp_min_h=None, temp_min_h_time=None, temp_max_h=None, temp_max_h_time=None, temp_min=None, temp_min_time=None, temp_max=None, temp_max_time=None, all_temps_amount=None, all_temps=None):
-        self.temp_current = temp_current
-        self.temp_current_time = temp_current_time
-        self.temp_min_h = temp_min_h
-        self.temp_min_h_time = temp_min_h_time
-        self.temp_max_h = temp_max_h
-        self.temp_max_h_time = temp_max_h_time
-        self.temp_min = temp_min
-        self.temp_min_time = temp_min_time
-        self.temp_max = temp_max
-        self.temp_max_time = temp_max_time
-        self.all_temps_amount = all_temps_amount
-        self.all_temps = all_temps
-
-class ExtractedPrecip:
-    def __init__(self, precip_sum=None, all_precip_amount=None, all_precips=None):
-        self.precip_sum = precip_sum
-        self.all_precip_amount = all_precip_amount
-        self.all_precips = all_precips
-
-def find_przymrozek(przymrozek_list, lon, lat):
-    if len(przymrozek_list) == 1:
-        return przymrozek_list[0]
-    for item in przymrozek_list:
-        if item.get('lon') == lon and item.get('lat') == lat:
-            return item
+        pass
     return None
 
-def extract_precip_data(temperature_data):
-    precip_sum = None
-    all_precips = None
-    if temperature_data and isinstance(temperature_data.get("precip"), list) and len(temperature_data.get("precip")) > 0:
-        valid_precips = []
-        for t in temperature_data.get("precip", []):
-            if t["value"] is None or t["date"] is None:
-                continue
-            try:
-                dt = parser.isoparse(t["date"])
-            except Exception:
-                continue
-            start_percip = start_utc + timedelta(hours=1) 
-            if start_percip <= dt <= end_utc:
-                valid_precips.append(t)
-        if valid_precips:
-            all_precips = valid_precips
-            if len(valid_precips) > 0:
-                precip_sum = 0
-                for t in valid_precips:
-                    precip_sum += t["value"]
-    return ExtractedPrecip(
-        precip_sum=precip_sum,
-        all_precips=all_precips,
-        all_precip_amount=len(all_precips) if all_precips and isinstance(all_precips, list) else 0
-    )
-
-def extract_temperature_data(temperature_data, przymrozki_data, station_name, lon, lat):
-    temp_current = None
-    temp_current_time = None
-    temp_min_h = None
-    temp_min_h_time = None
-    temp_max_h = None
-    temp_max_h_time = None
-    temp_min = None
-    temp_min_time = None
-    temp_max = None
-    temp_max_time = None
-    all_temps = None
-
-    if temperature_data and isinstance(temperature_data.get("temperature"), list) and len(temperature_data.get("temperature")) > 0:
-        valid_temps = []
-        for t in temperature_data.get("temperature", []):
-            if t.get("value") is None or t.get("date") is None:
-                continue
-            try:
-                dt = parser.isoparse(t["date"])
-            except Exception:
-                continue
-            if start_utc <= dt <= end_utc:
-                valid_temps.append(t)
-        if valid_temps:
-            min_temp_entry = min(valid_temps, key=lambda t: t["value"])
-            max_temp_entry = max(valid_temps, key=lambda t: t["value"])
-            temp_min_h = min_temp_entry["value"]
-            temp_min_h_time = min_temp_entry["date"]
-            temp_max_h = max_temp_entry["value"]
-            temp_max_h_time = max_temp_entry["date"]
-            all_temps = valid_temps
-
-        if przymrozki_data and przymrozki_data[station_name]:
-            przymrozki_list = przymrozki_data[station_name]
-            if przymrozki_list:
-                przymrozek = find_przymrozek(przymrozki_list, lon, lat)
-                if przymrozek:
-                    if przymrozek.get("temp_min_2m") is not None: temp_min = float(przymrozek["temp_min_2m"])
-                    if przymrozek.get("temp_max_2m") is not None: temp_max = float(przymrozek["temp_max_2m"])
-
-        try:
-            t = temperature_data["temperature"][-1]
-            dt = parser.isoparse(t["date"])
-            hour_ago = now.replace(minute=0, second=0, microsecond=0)
-            if hour_ago <= dt:
-                temp_current = t.get("value")
-                temp_current_time = t.get("date")
-        except Exception:
-            pass
-
-    return ExtractedTemps(
-        temp_current=temp_current,
-        temp_current_time=temp_current_time,
-        temp_min_h=temp_min_h,
-        temp_min_h_time=temp_min_h_time,
-        temp_max_h=temp_max_h,
-        temp_max_h_time=temp_max_h_time,
-        temp_min=temp_min,
-        temp_min_time=temp_min_time,
-        temp_max=temp_max,
-        temp_max_time=temp_max_time,
-        all_temps=all_temps,
-        all_temps_amount=len(all_temps) if all_temps and isinstance(all_temps, list) else 0
-    )
-
-async def fetch_json(session, url):
+stations_map = {}
+for _, row in stations_df.iterrows():
+    sid = str(row["Station_id"]).strip()
+    coords = parse_coordinates(row["Coordinates"])
     try:
-        async with session.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5) as response:
-            return await response.json() if response.status == 200 else None
-    except Exception:
-        return None
+        elev = float(row["Elevation"]) if not pd.isna(row["Elevation"]) else None
+    except ValueError:
+        elev = None
+        
+    stations_map[sid] = {
+        "Station_id": sid,
+        "Station_name": str(row["Station_name"]).strip(),
+        "coordinates": coords,
+        "Elevation": elev,
+        "Status": str(row["Status"]).strip().upper()
+    }
 
-async def get_przymrozki_data_grouped_by_name(session):
-    data = await fetch_przymrozki_json(przymrozki_url)
-    if not data:
-        return {}
-    grouped_data = defaultdict(list)
-    for item in data:
-        name = item.get("name", "UNKNOWN")
-        grouped_data[name].append(item)
-    return grouped_data
+async def fetch_station_extra(session, station_id):
+    req_url = f"{temperature_url_base}{station_id}"
+    try:
+        async with session.get(req_url, timeout=10) as response:
+            if response.status == 200:
+                text = await response.text()
+                if text.strip():
+                    return json.loads(text)
+    except Exception:
+        pass
+    return None
 
 async def process_station(session, data, przymrozki_data):
-    temperature_url = f"{temperature_url_base}{data['kod_stacji']}&hoursInterval={hours_interval}"
-    temperature_data = await fetch_json(session, temperature_url)
-
-    extracted_temps = extract_temperature_data(temperature_data, przymrozki_data, data["nazwa_stacji"], data["lon"], data["lat"])
-    extracted_precips = extract_precip_data(temperature_data)
-
-    station_id = data["kod_stacji"]
+    station_id = data.get("kod_stacji")
+    if not station_id:
+        return None
+        
+    station_id = str(station_id).strip()
     station_info = stations_map.get(station_id)
-
-    if not station_info or not station_info["coordinates"]:
+    
+    if not station_info or not station_info.get("coordinates"):
         return None
 
-    coords = station_info["coordinates"]
+    try:
+        ta = float(data.get("temperatura")) if data.get("temperatura") is not None else None
+    except ValueError:
+        ta = None
 
-    raw_properties = {
+    try:
+        p24 = float(data.get("suma_opadu")) if data.get("suma_opadu") is not None else None
+    except ValueError:
+        p24 = None
+
+    extra = await fetch_station_extra(session, station_id)
+    
+    tmin, tmax, tmin_hour, tmax_hour, p10 = None, None, None, None, None
+    w_avg, w_max = None, None
+
+    if extra and isinstance(extra, list) and len(extra) > 0:
+        latest = extra[0]
+        
+        if latest.get("temperatureMin24h") is not None:
+            try: tmin = float(latest["temperatureMin24h"])
+            except ValueError: pass
+        if latest.get("temperatureMax24h") is not None:
+            try: tmax = float(latest["temperatureMax24h"])
+            except ValueError: pass
+        if latest.get("temperatureMin24hTime") is not None:
+            tmin_hour = latest["temperatureMin24hTime"]
+        if latest.get("temperatureMax24hTime") is not None:
+            tmax_hour = latest["temperatureMax24hTime"]
+            
+        if latest.get("precipitation10m") is not None:
+            try: p10 = float(latest["precipitation10m"])
+            except ValueError: pass
+            
+        if latest.get("windSpeedAverage") is not None:
+            try: w_avg = float(latest["windSpeedAverage"])
+            except ValueError: pass
+        if latest.get("windSpeedMax") is not None:
+            try: w_max = float(latest["windSpeedMax"])
+            except ValueError: pass
+
+    tg = None
+    if przymrozki_data and isinstance(przymrozki_data, list):
+        for p_row in przymrozki_data:
+            if str(p_row.get("kod")).strip() == station_id:
+                if p_row.get("t5") is not None:
+                    try:
+                        tg = float(p_row["t5"])
+                    except ValueError:
+                        pass
+                break
+
+    properties = {
         "Station_id": station_id,
         "Station_name": station_info["Station_name"],
-        "Status": station_info["Status"],
+        "Status": "ACTIVE",
         "Elevation": station_info["Elevation"],
-        "Ta": getattr(extracted_temps, 'temp_current', None) if extracted_temps else None,
-        "Ta_time": getattr(extracted_temps, 'temp_current_time', None) if extracted_temps else None,
-        "Tmin_hour": getattr(extracted_temps, 'temp_min_h', None) if extracted_temps else None,
-        "Tmin_hour_time": getattr(extracted_temps, 'temp_min_h_time', None) if extracted_temps else None,
-        "Tmax_hour": getattr(extracted_temps, 'temp_max_h', None) if extracted_temps else None,
-        "Tmax_hour_time": getattr(extracted_temps, 'temp_max_h_time', None) if extracted_temps else None,
-        "Tmin": getattr(extracted_temps, 'temp_min', None) if extracted_temps else None,
-        "Tmin_time": getattr(extracted_temps, 'temp_min_time', None) if extracted_temps else None,
-        "Tmax": getattr(extracted_temps, 'temp_max', None) if extracted_temps else None,
-        "Tmax_time": getattr(extracted_temps, 'temp_max_time', None) if extracted_temps else None,
-        "Number_of_measurements": getattr(extracted_temps, 'all_temps_amount', None) if extracted_temps else None,
-        "Tg": float(data['temperatura_gruntu']) if data['temperatura_gruntu'] else None,
-        "Tg_time": data['temperatura_gruntu_data'],
-        "Wind_dir": float(data['wiatr_kierunek']) if data['wiatr_kierunek'] else None,
-        "Wind_dir_time": data['wiatr_kierunek_data'],
-        "Wind_avg": float(data['wiatr_srednia_predkosc']) if data['wiatr_srednia_predkosc'] else None,
-        "Wind_avg_time": data['wiatr_srednia_predkosc_data'],
-        "Wind_max": float(data['wiatr_predkosc_maksymalna']) if data['wiatr_predkosc_maksymalna'] else None,
-        "Wind_max_time": data['wiatr_predkosc_maksymalna_data'],
-        "RH": float(data['wilgotnosc_wzgledna']) if data['wilgotnosc_wzgledna'] else None,
-        "RH_time": data['wilgotnosc_wzgledna_data'],
-        "Wind_gust_10min": float(data['wiatr_poryw_10min']) if data['wiatr_poryw_10min'] else None,
-        "Wind_gust_10min_time": data['wiatr_poryw_10min_data'],
-        "Precip_10min": float(data['opad_10min']) if data['opad_10min'] else None,
-        "Precip_10min_time": data['opad_10min_data'],
-        "Precip_24h": getattr(extracted_precips, 'precip_sum', None) if extracted_precips else None,
-        "Number_of_precip_measurements": getattr(extracted_precips, 'all_precip_amount', None) if extracted_precips else None
+        "Ta": ta,
+        "Tmin": tmin,
+        "Tmax": tmax,
+        "Tmin_hour": tmin_hour,
+        "Tmax_hour": tmax_hour,
+        "Tg": tg,
+        "Precip_24h": p24,
+        "Precip_10min": p10,
+        "Wind_avg": w_avg,
+        "Wind_max": w_max
     }
-    properties = {k: v for k, v in raw_properties.items() if v is not None}
 
     return {
         "type": "Feature",
-        "geometry": {"type": "Point", "coordinates": coords},
+        "geometry": {
+            "type": "Point",
+            "coordinates": station_info["coordinates"]
+        },
         "properties": properties
     }
 
 async def process_missing_station(session, station_info, przymrozki_data):
-    temperature_url = f"{temperature_url_base}{station_info.get('Station_id')}&hoursInterval={hours_interval}"
-    temperature_data = await fetch_json(session, temperature_url)
+    station_id = station_info["Station_id"]
+    extra = await fetch_station_extra(session, station_id)
+    
+    tmin, tmax, tmin_hour, tmax_hour, p10 = None, None, None, None, None
+    w_avg, w_max = None, None
 
-    extracted_temps = extract_temperature_data(temperature_data, przymrozki_data, station_info.get("Station_name"), station_info.get("coordinates")[0], station_info.get("coordinates")[1])
-    extracted_precips = extract_precip_data(temperature_data)
-         
-    raw_properties = {
-        "Station_id": station_info.get("Station_id"),
-        "Station_name": station_info.get("Station_name"),
-        "Status": station_info["Status"],
+    if extra and isinstance(extra, list) and len(extra) > 0:
+        latest = extra[0]
+        if latest.get("temperatureMin24h") is not None:
+            try: tmin = float(latest["temperatureMin24h"])
+            except ValueError: pass
+        if latest.get("temperatureMax24h") is not None:
+            try: tmax = float(latest["temperatureMax24h"])
+            except ValueError: pass
+        if latest.get("temperatureMin24hTime") is not None:
+            tmin_hour = latest["temperatureMin24hTime"]
+        if latest.get("temperatureMax24hTime") is not None:
+            tmax_hour = latest["temperatureMax24hTime"]
+        if latest.get("precipitation10m") is not None:
+            try: p10 = float(latest["precipitation10m"])
+            except ValueError: pass
+        if latest.get("windSpeedAverage") is not None:
+            try: w_avg = float(latest["windSpeedAverage"])
+            except ValueError: pass
+        if latest.get("windSpeedMax") is not None:
+            try: w_max = float(latest["windSpeedMax"])
+            except ValueError: pass
+
+    tg = None
+    if przymrozki_data and isinstance(przymrozki_data, list):
+        for p_row in przymrozki_data:
+            if str(p_row.get("kod")).strip() == station_id:
+                if p_row.get("t5") is not None:
+                    try: tg = float(p_row["t5"])
+                    except ValueError: pass
+                break
+
+    properties = {
+        "Station_id": station_id,
+        "Station_name": station_info["Station_name"],
+        "Status": "ACTIVE",
         "Elevation": station_info["Elevation"],
-        "Ta": getattr(extracted_temps, 'temp_current', None) if extracted_temps else None,
-        "Ta_time": getattr(extracted_temps, 'temp_current_time', None) if extracted_temps else None,
-        "Tmin_hour": getattr(extracted_temps, 'temp_min_h', None) if extracted_temps else None,
-        "Tmin_hour_time": getattr(extracted_temps, 'temp_min_h_time', None) if extracted_temps else None,
-        "Tmax_hour": getattr(extracted_temps, 'temp_max_h', None) if extracted_temps else None,
-        "Tmax_hour_time": getattr(extracted_temps, 'temp_max_h_time', None) if extracted_temps else None,
-        "Tmin": getattr(extracted_temps, 'temp_min', None) if extracted_temps else None,
-        "Tmin_time": getattr(extracted_temps, 'temp_min_time', None) if extracted_temps else None,
-        "Tmax": getattr(extracted_temps, 'temp_max', None) if extracted_temps else None,
-        "Tmax_time": getattr(extracted_temps, 'temp_max_time', None) if extracted_temps else None,
-        "Number_of_measurements": getattr(extracted_temps, 'all_temps_amount', None) if extracted_temps else None,
-        "Precip_24h": getattr(extracted_precips, 'precip_sum', None) if extracted_precips else None,
-        "Number_of_precip_measurements": getattr(extracted_precips, 'all_precip_amount', None) if extracted_precips else None
+        "Ta": None,
+        "Tmin": tmin,
+        "Tmax": tmax,
+        "Tmin_hour": tmin_hour,
+        "Tmax_hour": tmax_hour,
+        "Tg": tg,
+        "Precip_24h": None,
+        "Precip_10min": p10,
+        "Wind_avg": w_avg,
+        "Wind_max": w_max
     }
-    properties = {k: v for k, v in raw_properties.items() if v is not None}
 
     return {
         "type": "Feature",
-        "geometry": {"type": "Point", "coordinates": station_info.get("coordinates")},
+        "geometry": {
+            "type": "Point",
+            "coordinates": station_info["coordinates"]
+        },
         "properties": properties
     }
 
 def process_closed_station(station_info):
-    raw_properties = {
-        "Station_id": station_info.get("Station_id"),
-        "Station_name": station_info.get("Station_name"),
-        "Status": station_info["Status"],
-        "Elevation": station_info["Elevation"],
-    }
-    properties = {k: v for k, v in raw_properties.items() if v is not None}
-
     return {
         "type": "Feature",
-        "geometry": {"type": "Point", "coordinates": station_info.get("coordinates")},
-        "properties": properties
+        "geometry": {
+            "type": "Point",
+            "coordinates": station_info["coordinates"]
+        },
+        "properties": {
+            "Station_id": station_info["Station_id"],
+            "Station_name": station_info["Station_name"],
+            "Status": "CLOSED",
+            "Elevation": station_info["Elevation"]
+        }
     }
 
 async def main():
+    try:
+        response_przymrozki = requests.get(przymrozki_url, timeout=15)
+        if response_przymrozki.status_code == 200:
+            przymrozki_data = response_przymrozki.json()
+        else:
+            przymrozki_data = None
+    except Exception:
+        przymrozki_data = None
+
     async with aiohttp.ClientSession() as session:
-        imgw_data = await fetch_json(session, url)
-        if not imgw_data:
-            print("Błąd pobierania danych IMGW.")
+        try:
+            async with session.get(url, timeout=15) as response:
+                if response.status == 200:
+                    imgw_data = await response.json()
+                else:
+                    print("Błąd pobierania głównego API IMGW")
+                    return
+        except Exception as e:
+            print(f"Błąd połączenia z API IMGW: {e}")
             return
 
-        przymrozki_data = await get_przymrozki_data_grouped_by_name(session)
-        if not przymrozki_data:
-            print("Błąd pobierania danych przymrozków lub brak danych na dzisiaj.")
-            przymrozki_data = None
+        # 1. Definiujemy folder bazy danych i ścieżkę pliku dziennego
+        output_dir = "imgw_baza"
+        os.makedirs(output_dir, exist_ok=True)
+        
+        date_str = f"{year}-{addZero(month)}-{addZero(day)}"
+        daily_file_path = os.path.join(output_dir, f"{date_str}.json")
 
-        tasks = [process_station(session, data, przymrozki_data) for data in imgw_data]
-        features = await tqdm_asyncio.gather(*tasks, desc="Pobieranie danych stacji")
-        features = [f for f in features if f is not None]
+        # Określamy klucz aktualnej godziny pomiarowej (np. "2026-06-03 22:00")
+        current_hour_str = f"{now_local.hour:02d}:00"
+        timestamp_key = f"{date_str} {current_hour_str}"
+
+        # 2. Budujemy świeżą listę featurów z obecnego pobrania
+        new_features = []
+        
+        active_tasks = [process_station(session, data, przymrozki_data) for data in imgw_data]
+        features_fetched = await tqdm_asyncio.gather(*active_tasks, desc="Pobieranie danych stacji")
+        features_fetched = [f for f in features_fetched if f is not None]
+        new_features.extend(features_fetched)
 
         active_station_ids = {sid for sid, info in stations_map.items() if info["Status"] == "ACTIVE"}
         imgw_station_ids = {obj["kod_stacji"] for obj in imgw_data}
         missing_station_ids = active_station_ids - imgw_station_ids
-
         missing_stations = [stations_map[sid] for sid in missing_station_ids if stations_map[sid]["coordinates"]]
 
         if missing_stations:
             missing_tasks = [process_missing_station(session, station, przymrozki_data) for station in missing_stations]
             missing_features = await tqdm_asyncio.gather(*missing_tasks, desc="Pobieranie brakujących stacji")
-            features.extend(missing_features)
+            new_features.extend(missing_features)
 
         closed_stations = [station_info for station_info in stations_map.values() if station_info["Status"] == "CLOSED" and station_info.get("coordinates")]
-
         if closed_stations:
             closed_features = [process_closed_station(station_info) for station_info in closed_stations]
-            features.extend(closed_features)
+            new_features.extend(closed_features)
 
-        with open("imgw_data.geojson", "w", encoding="utf-8") as f:
-            json.dump({"type": "FeatureCollection", "features": features}, f, ensure_ascii=False, indent=4)
+        # 3. Wczytujemy istniejący plik dzienny lub tworzymy nową strukturę od zera
+        existing_data = None
+        if os.path.exists(daily_file_path):
+            try:
+                with open(daily_file_path, "r", encoding="utf-8") as f:
+                    existing_data = json.load(f)
+            except Exception:
+                existing_data = None
 
-        print("Plik 'imgw_data.geojson' został zaktualizowany!")
+        if not existing_data:
+            existing_data = {
+                "type": "FeatureCollection",
+                "features": []
+            }
+            for nf in new_features:
+                base_f = {
+                    "type": "Feature",
+                    "geometry": nf["geometry"],
+                    "properties": {
+                        "Station_id": nf["properties"]["Station_id"],
+                        "Station_name": nf["properties"]["Station_name"],
+                        "Status": nf["properties"]["Status"],
+                        "Elevation": nf["properties"].get("Elevation"),
+                        "Measurements": {}
+                    }
+                }
+                existing_data["features"].append(base_f)
 
-asyncio.run(main())
+        # 4. Mapujemy stacje w celu szybkiej aktualizacji słownika 'Measurements'
+        existing_stations_map = {f["properties"]["Station_id"]: f for f in existing_data["features"]}
+
+        for nf in new_features:
+            sid = nf["properties"]["Station_id"]
+            if nf["properties"]["Status"] == "ACTIVE" and sid in existing_stations_map:
+                props = nf["properties"]
+                
+                hourly_measurement = {
+                    "Ta": props.get("Ta"),
+                    "Tmin": props.get("Tmin"),
+                    "Tmax": props.get("Tmax"),
+                    "Tmin_hour": props.get("Tmin_hour"),
+                    "Tmax_hour": props.get("Tmax_hour"),
+                    "Tg": props.get("Tg"),
+                    "Precip_24h": props.get("Precip_24h"),
+                    "Precip_10min": props.get("Precip_10min"),
+                    "Wind_avg": props.get("Wind_avg"),
+                    "Wind_max": props.get("Wind_max")
+                }
+                
+                if "Measurements" not in existing_stations_map[sid]["properties"]:
+                    existing_stations_map[sid]["properties"]["Measurements"] = {}
+                
+                existing_stations_map[sid]["properties"]["Measurements"][timestamp_key] = hourly_measurement
+
+        # 5. Zapisujemy zaktualizowany plik dzienny do katalogu bazy danych
+        with open(daily_file_path, "w", encoding="utf-8") as f:
+            json.dump(existing_data, f, ensure_ascii=False, indent=4)
+
+        print(f"Pomyślnie zaktualizowano bazę dzienną: {daily_file_path} dla klucza {timestamp_key}")
+
+if __name__ == "__main__":
+    asyncio.run(main())

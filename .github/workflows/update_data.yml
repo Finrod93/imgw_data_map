@@ -2,8 +2,8 @@ name: Hourly IMGW Data Update
 
 on:
   schedule:
-    # Odpala siê 15 ORAZ 45 minut po ka¿dej pe³nej godzinie (wiêksza szansa na punktualnoœæ)
-    - cron: '15,45 * * * *'  
+    # Odpala siê 15, 30 ORAZ 45 minut po ka¿dej pe³nej godzinie (wiêksza szansa na punktualnoœæ)
+    - cron: '15,30,45 * * * *'  
   workflow_dispatch:     # Pozwala te¿ uruchomiæ skrypt rêcznie jednym klikniêciem
 
 env:
@@ -35,15 +35,8 @@ jobs:
         git config --global user.name "IMGW Data Bot"
         git config --global user.email "actions@github.com"
         
-        if [ -f "imgw_baza.json" ]; then
-          git add imgw_baza.json
-          if ! git diff --cached --quiet; then
-            git commit -m "Aktualizacja bazy godzinowej IMGW: $(date +'%Y-%m-%d %H:%M')"
-            git push origin main
-          else
-            echo "Brak nowych danych do zapisania."
-          fi
-        else
-          echo "B£¥D: Plik imgw_baza.json nie powsta³ podczas dzia³ania skryptu Pythona."
-          exit 1
-        fi
+        # Dodajemy ca³y folder bazy z plikami dziennymi json
+        git add imgw_baza/
+        
+        # Commit i push zmian do repozytorium, o ile pojawi³y siê nowe dane hourly
+        git diff --quiet && git diff --staged --quiet || (git commit -m "Automatyczna aktualizacja bazy dziennej IMGW [$(date)]" && git push)

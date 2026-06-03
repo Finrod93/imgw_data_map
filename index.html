@@ -3,167 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stacje Meteorologiczne IMGW - Panel Kontrolny</title>
-    
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-    
+    <title>Mapa IMGW - Oś Czasu</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        html, body {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            width: 100%;
-            font-family: Arial, sans-serif;
-        }
-        #map {
-            height: 100%;
-            width: 100%;
-        }
+        html, body { margin: 0; padding: 0; height: 100%; width: 100%; font-family: Arial, sans-serif; }
+        #map { height: calc(100% - 70px); width: 100%; }
         
-        /* BAZOWY STYL ETYKIET */
-        .stacja-etykieta {
-            background: none !important; 
-            border-radius: 2px !important;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.15) !important;
-            font-family: Arial, sans-serif !important;
-            font-size: 11px !important;
-            font-weight: bold !important; 
-            white-space: nowrap !important;
-            display: inline-flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            text-align: center !important;
-            line-height: normal !important;
-            padding: 0 !important; 
-            border: none !important; 
+        #timeline-container {
+            height: 70px; background: #2c3e50; color: white;
+            display: flex; align-items: center; padding: 0 20px;
+            box-sizing: border-box; gap: 20px;
         }
+        .control-group { display: flex; align-items: center; gap: 10px; font-weight: bold; }
+        input[type="date"] { padding: 6px; border-radius: 4px; border: none; font-weight: bold; }
+        #time-slider { flex-grow: 1; cursor: pointer; }
+        #current-time-display { min-width: 60px; font-size: 16px; font-weight: bold; background: #16a085; padding: 5px 10px; border-radius: 4px; text-align: center; }
 
+        .stacja-etykieta { background: none !important; border-radius: 2px !important; box-shadow: 0 1px 2px rgba(0,0,0,0.15) !important; font-size: 11px !important; font-weight: bold !important; white-space: nowrap !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; text-align: center !important; padding: 0 !important; border: none !important; color: #000 !important; }
         .etykieta-gora { margin-top: -5px !important; }
         .etykieta-dol { margin-top: 5px !important; }
-
-        /* KOLOROWE RAMKI DLA EKSTREMÓW */
-        .ramka-max {
-            border: 2px solid #ff0000 !important;
-        }
-        .ramka-min {
-            border: 2px solid #0000ff !important;
-        }
-
-        /* CZARNY TEKST DLA DANYCH BEZ CIENI I PODKREŚLEŃ */
-        .stacja-etykieta,
-        .temp-aktualna, .temp-min, .temp-min-hour, .temp-max, .temp-max-hour, .temp-grunt,
-        .opad-dobowy, .opad-10min, .wiatr-avg, .wiatr-max, .wysokosc, .nazwa-stacji { 
-            color: #000000 !important;
-            text-shadow: none !important;
-            text-decoration: none !important;
-        }
-
-        /* Standardowe parametry */
-        .opad-dobowy { background: rgba(255, 255, 255, 0.95) !important; border: 1px solid #4cd137 !important; padding: 0px 2px !important;}
-        .opad-10min { background: rgba(255, 255, 255, 0.95) !important; border: 1px solid #a3cb38 !important; padding: 0px 2px !important;}
-        .wiatr-avg { background: rgba(255, 255, 255, 0.95) !important; border: 1px solid #9980fa !important; padding: 0px 2px !important;}
-        .wiatr-max { background: rgba(255, 255, 255, 0.95) !important; border: 1px solid #52307c !important; padding: 0px 2px !important;}
-        .wysokosc { background: rgba(255, 255, 255, 0.95) !important; border: 1px solid #8d6e63 !important; padding: 0px 2px !important;}
-        .nazwa-stacji { background: rgba(255, 255, 255, 0.95) !important; border: 1px solid #b2bec3 !important; padding: 0px 2px !important;}
-
-        .leaflet-tooltip-top::before, 
-        .leaflet-tooltip-bottom::before, 
-        .leaflet-tooltip-left::before, 
-        .leaflet-tooltip-right::before {
-            display: none !important;
-        }
-
-        .leaflet-control-layers-separator {
-            border-top: 1px solid #ddd;
-            margin: 5px -10px 5px -10px;
-        }
-        .leaflet-menu-section-title {
-            font-size: 11px;
-            color: #555;
-            font-weight: bold;
-            padding: 2px 0;
-        }
-
-        /* SUWAK PRZEZROCZYSTOŚCI */
-        .slider-opacity-container {
-            background: rgba(255, 255, 255, 0.9);
-            padding: 8px 12px;
-            border-radius: 4px;
-            box-shadow: 0 1px 5px rgba(0,0,0,0.4);
-            font-size: 12px;
-            font-weight: bold;
-            color: #333;
-            margin-top: 10px;
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-            min-width: 150px;
-        }
-        .slider-opacity-container input[type=range] {
-            cursor: pointer;
-            width: 100%;
-            margin: 0;
-        }
-
-        /* PIONOWA LEGENDA */
-        .map-legend-container {
-            background: rgba(255, 255, 255, 0.92);
-            padding: 10px 14px;
-            border-radius: 5px;
-            box-shadow: 0 1px 6px rgba(0,0,0,0.25);
-            font-family: Arial, sans-serif;
-            color: #2c3e50;
-            min-width: 90px;
-        }
-        .legend-title {
-            font-size: 11px;
-            font-weight: bold;
-            text-align: center;
-            margin-bottom: 8px;
-            border-bottom: 1px solid #ccc;
-            padding-bottom: 4px;
-        }
-        .legend-body {
-            display: flex;
-            flex-direction: row;
-            height: 340px; 
-        }
-        .legend-bar {
-            width: 14px;
-            height: 100%;
-            border: 1px solid #444;
-            border-radius: 2px;
-        }
-        .legend-labels {
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between; 
-            height: 100%;
-            margin-left: 4px;
-        }
-        .legend-label-row {
-            display: flex;
-            align-items: center;
-            height: 12px;
-            line-height: 12px;
-        }
-        .legend-tick {
-            font-size: 10px;
-            color: #7f8c8d;
-            margin-right: 2px;
-        }
-        .legend-value {
-            font-size: 10px;
-            font-weight: bold;
-        }
+        
+        .temp-aktualna, .temp-min, .temp-max, .temp-grunt, .opad-dobowy, .wiatr-avg, .wysokosc, .nazwa-stacji { background: rgba(255, 255, 255, 0.95) !important; border: 1px solid #666 !important; padding: 1px 3px !important; border-radius: 2px; }
+        .leaflet-tooltip-top::before, .leaflet-tooltip-bottom::before { display: none !important; }
+        .leaflet-control-layers-separator { border-top: 1px solid #ddd; margin: 5px -10px; }
+        .leaflet-menu-section-title { font-size: 11px; color: #555; font-weight: bold; padding: 2px 0; }
     </style>
 </head>
 <body>
 
     <div id="map"></div>
-
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     
+    <div id="timeline-container">
+        <div class="control-group">
+            <label for="date-picker">Dzień:</label>
+            <input type="date" id="date-picker">
+        </div>
+        <div class="control-group" style="flex-grow: 1;">
+            <label for="time-slider">Godzina:</label>
+            <input type="range" id="time-slider" min="0" max="23" value="12">
+            <div id="current-time-display">12:00</div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

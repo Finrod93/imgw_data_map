@@ -3,46 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mapa IMGW - Oś Czasu</title>
+    <title>Automatyczna Mapa Pogodowa IMGW</title>
+    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
     <style>
-        html, body { margin: 0; padding: 0; height: 100%; width: 100%; font-family: Arial, sans-serif; }
-        #map { height: calc(100% - 70px); width: 100%; }
-        
-        #timeline-container {
-            height: 70px; background: #2c3e50; color: white;
-            display: flex; align-items: center; padding: 0 20px;
-            box-sizing: border-box; gap: 20px;
+        /* Mapa na pełen ekran */
+        html, body, #map {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            font-family: Arial, sans-serif;
         }
-        .control-group { display: flex; align-items: center; gap: 10px; font-weight: bold; }
-        input[type="date"] { padding: 6px; border-radius: 4px; border: none; font-weight: bold; }
-        #time-slider { flex-grow: 1; cursor: pointer; }
-        #current-time-display { min-width: 60px; font-size: 16px; font-weight: bold; background: #16a085; padding: 5px 10px; border-radius: 4px; text-align: center; }
 
-        .stacja-etykieta { background: none !important; border-radius: 2px !important; box-shadow: 0 1px 2px rgba(0,0,0,0.15) !important; font-size: 11px !important; font-weight: bold !important; white-space: nowrap !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; text-align: center !important; padding: 0 !important; border: none !important; color: #000 !important; }
-        .etykieta-gora { margin-top: -5px !important; }
-        .etykieta-dol { margin-top: 5px !important; }
-        
-        .temp-aktualna, .temp-min, .temp-max, .temp-grunt, .opad-dobowy, .wiatr-avg, .wysokosc, .nazwa-stacji { background: rgba(255, 255, 255, 0.95) !important; border: 1px solid #666 !important; padding: 1px 3px !important; border-radius: 2px; }
-        .leaflet-tooltip-top::before, .leaflet-tooltip-bottom::before { display: none !important; }
-        .leaflet-control-layers-separator { border-top: 1px solid #ddd; margin: 5px -10px; }
-        .leaflet-menu-section-title { font-size: 11px; color: #555; font-weight: bold; padding: 2px 0; }
+        /* Styl ciemnego panelu dolnego (Oś czasu i suwak) */
+        #timeline-container {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            max-width: 800px;
+            background: rgba(30, 30, 30, 0.9);
+            color: #fff;
+            padding: 15px 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        #timeline-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        #current-time-label {
+            color: #00ecff;
+            background: rgba(0,0,0,0.3);
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        #date-picker {
+            width: 100%;
+            cursor: pointer;
+            accent-color: #00ecff;
+        }
+
+        /* Styl dla legendy Leafleta */
+        .info.legend {
+            background: white;
+            padding: 10px;
+            font-size: 12px;
+            line-height: 18px;
+            color: #333;
+            border-radius: 5px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+        }
     </style>
 </head>
 <body>
 
     <div id="map"></div>
-    
+
     <div id="timeline-container">
-        <div class="control-group">
-            <label for="date-picker">Dzień:</label>
-            <input type="date" id="date-picker">
+        <div id="timeline-header">
+            <span>Archiwum danych godzinowych IMGW</span>
+            <span id="current-time-label">Wczytywanie godziny...</span>
         </div>
-        <div class="control-group" style="flex-grow: 1;">
-            <label for="time-slider">Godzina:</label>
-            <input type="range" id="time-slider" min="0" max="23" value="12">
-            <div id="current-time-display">12:00</div>
-        </div>
+        <input type="range" id="date-picker" min="0" max="0" value="0">
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

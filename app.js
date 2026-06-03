@@ -1,19 +1,23 @@
-// Konfiguracja podkładów mapowych (Wybór bazy)
+// 🌍 PRZYWRÓCENIE WSZYSTKICH PODKŁADÓW MAPY
 const baseLayers = {
     "OpenStreetMap": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
     }),
     "Satelita (Esri)": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         attribution: 'Tiles © Esri'
+    }),
+    "Topograficzna (Topo)": L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenTopoMap contributors'
+    }),
+    "Ciemny (CartoDB)": L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© CartoDB'
     })
 };
 
-// Inicjalizacja mapy z domyślnym podkładem OSM
 const map = L.map('map', {
     layers: [baseLayers["OpenStreetMap"]]
 }).setView([52.0689, 19.4797], 6);
 
-// Warstwy pomiarowe
 const layers = {
     temperature: L.layerGroup(),
     ground_temp: L.layerGroup(),
@@ -25,7 +29,6 @@ const layers = {
 };
 layers.temperature.addTo(map);
 
-// Menu wyboru podkładów oraz warstw danych pogodowych
 L.control.layers(baseLayers, {
     "Temperatura powietrza (Ta)": layers.temperature,
     "Temperatura przy gruncie (Tg)": layers.ground_temp,
@@ -36,13 +39,13 @@ L.control.layers(baseLayers, {
     "Suma opadu (24h)": layers.precipitation
 }, { collapsed: false }).addTo(map);
 
-// Kontrola przeźroczystości podkładu mapy
+// 🎚️ PRZEŹROCZYSTOŚĆ PODKŁADU Z PROCENTAMI
 const opacityControl = L.control({ position: 'topright' });
 opacityControl.onAdd = function() {
     const div = L.DomUtil.create('div', 'opacity-control-panel');
     div.innerHTML = `
-        <label>Podkład:</label>
-        <input type="range" id="bg-opacity-slider" min="0" max="1" step="0.1" value="1" style="width: 70px;">
+        <label for="bg-opacity-slider">Przeźroczystość podkładu: <span id="opacity-pct">100%</span></label>
+        <input type="range" id="bg-opacity-slider" min="0" max="1" step="0.1" value="1">
     `;
     return div;
 };
@@ -50,15 +53,13 @@ opacityControl.addTo(map);
 
 document.getElementById('bg-opacity-slider').addEventListener('input', function(e) {
     const opacityValue = parseFloat(e.target.value);
-    Object.values(baseLayers).forEach(layer => {
-        layer.setOpacity(opacityValue);
-    });
+    document.getElementById('opacity-pct').innerText = `${Math.round(opacityValue * 100)}%`;
+    Object.values(baseLayers).forEach(layer => layer.setOpacity(opacityValue));
 });
 
 let imgwBazaDanych = {};
 let dostepneKlucze = [];
 
-// 17-punktowa skala z QGIS do płynnej interpolacji barw
 const tempScale = [
     { t: -40, r: 245, g: 242, b: 245 }, { t: -35, r: 212, g: 185, b: 204 }, { t: -30, r: 125, g: 90,  b: 110 }, 
     { t: -25, r: 214, g: 110, b: 247 }, { t: -20, r: 135, g: 45,  b: 230 }, { t: -15, r: 40,  g: 30,  b: 215 }, 
@@ -89,28 +90,53 @@ function getPrecipColor(p) {
     return p < 0.5 ? '#b3e5fc' : p < 2 ? '#4fc3f7' : p < 5 ? '#0288d1' : p < 15 ? '#01579b' : '#021a42';
 }
 
-// Rysowanie z uwzględnieniem pozycjonowania NAD kropką i klasami ekstremów krajowych
 function createRectMarker(latLng, value, unit, bgColor, popupText, layerGroup, isMax = false, isMin = false) {
     const formattedValue = parseFloat(value).toFixed(1);
     
-    // Budowanie klas dla ramki prostokąta
     let boxClass = "gis-rect-box";
     if (isMax) boxClass += " extreme-max";
     if (isMin) boxClass += " extreme-min";
     
-    // 🟢 Zielony punkt stacji zakotwiczony na współrzędnych
+    // 🟢 Zielony punkt stacji pod etykietą
     L.circleMarker(latLng, { 
         radius: 3.5, fillColor: '#24b14c', color: '#1b8539', weight: 1.5, fillOpacity: 1 
     }).bindPopup(popupText).addTo(layerGroup);
 
-    // Prostokąt danych umieszczony symetrycznie NAD zieloną kropką
+    // Prostokąt danych umieszczony symetrycznie i precyzyjnie NAD kropką
     L.marker(latLng, {
         icon: L.divIcon({
             className: 'gis-rect-label',
             html: `<div class="${boxClass}" style="background-color: ${bgColor};">${formattedValue}${unit}</div>`,
-            iconAnchor: [19, 22] // 19px (połowa szerokości), 22px (wysokość + margines nad punktem)
+            iconAnchor: [19, 22]
         })
     }).bindPopup(popupText).addTo(layerGroup);
+}
+
+// 🗂️ KOMPLETNA BUDOWA POPUPU ZE WSZYSTKIMI ZMIENNYMI I ELEVATION
+function budujPelnyPopup(props) {
+    const name = props.Station_name || "Stacja synoptyczna";
+    const elev = props.elevation != null ? `${props.elevation} m n.p.m.` : "brak danych";
+    
+    const f = (val, unit = '°C') => (val != null ? `${parseFloat(val).toFixed(1)}${unit}` : 'brak');
+
+    return `
+        <div style="font-family: Arial, sans-serif; font-size:11px; min-width:210px; color:#333;">
+            <b style="font-size:13px; color:#000;">${name}</b><br>
+            <span style="color:#666;">Wysokość: ${elev}</span>
+            <hr style="margin: 5px 0; border:0; border-top:1px solid #ddd;">
+            <table class="meteo-popup-table">
+                <tr><td><b>Ta (Powietrze):</b></td><td style="text-align:right; font-weight:bold;">${f(props.Ta)}</td></tr>
+                <tr><td><b>Tg (Przy gruncie):</b></td><td style="text-align:right;">${f(props.Tg)}</td></tr>
+                <tr><td><b>Tmin_hour (Godzinowa):</b></td><td style="text-align:right; color:#1976d2;">${f(props.Tmin_hour)}</td></tr>
+                <tr><td><b>Tmax_hour (Godzinowa):</b></td><td style="text-align:right; color:#d32f2f;">${f(props.Tmax_hour)}</td></tr>
+                <tr><td><b>Średni wiatr:</b></td><td style="text-align:right;">${f(props.Wind_avg, ' m/s')}</td></tr>
+                <tr><td><b>Poryw maksymalny:</b></td><td style="text-align:right; font-weight:bold; color:#c2410c;">${f(props.Wind_max, ' m/s')}</td></tr>
+                <tr><td><b>Suma opadu (24h):</b></td><td style="text-align:right; color:#0288d1;">${f(props.Precip_24h, ' mm')}</td></tr>
+                ${props.Po != null ? `<tr><td><b>Ciśnienie (Po):</b></td><td style="text-align:right;">${parseFloat(props.Po).toFixed(1)} hPa</td></tr>` : ''}
+                ${props.Rh != null ? `<tr><td><b>Wilgotność (Rh):</b></td><td style="text-align:right;">${Math.round(props.Rh)}%</td></tr>` : ''}
+            </table>
+        </div>
+    `;
 }
 
 function wyswietlDaneDlaGodziny(klucz) {
@@ -118,7 +144,7 @@ function wyswietlDaneDlaGodziny(klucz) {
     const stacje = imgwBazaDanych[klucz];
     if (!stacje) return;
 
-    // 🔍 DYNAMICZNE WYSZUKIWANIE REKORDÓW MIN/MAX W TEJ GODZINIE
+    // Obliczanie maksimów i minimów do obramowań
     let wszystkieTa = [], wszystkieTg = [], wszystkieTmin = [], wszystkieTmax = [];
     stacje.forEach(s => {
         if (s.properties.Ta != null) wszystkieTa.push(parseFloat(s.properties.Ta));
@@ -136,46 +162,42 @@ function wyswietlDaneDlaGodziny(klucz) {
         if (!stacja.geometry || !stacja.geometry.coordinates) return;
         const latLng = [stacja.geometry.coordinates[1], stacja.geometry.coordinates[0]];
         const props = stacja.properties;
-        const name = props.Station_name || "Stacja synoptyczna";
+        const popupContent = budujPelnyPopup(props);
 
         if (props.Ta !== undefined && props.Ta !== null) {
             const val = parseFloat(props.Ta);
-            createRectMarker(latLng, props.Ta, '°C', getTemperatureStyle(props.Ta).bg, `<b>${name}</b><br>Ta: ${val.toFixed(1)}°C`, layers.temperature, val === maxTa, val === minTa);
+            createRectMarker(latLng, props.Ta, '°C', getTemperatureStyle(props.Ta).bg, popupContent, layers.temperature, val === maxTa, val === minTa);
         }
         if (props.Tg !== undefined && props.Tg !== null) {
             const val = parseFloat(props.Tg);
-            createRectMarker(latLng, props.Tg, '°C', getTemperatureStyle(props.Tg).bg, `<b>${name}</b><br>Tg: ${val.toFixed(1)}°C`, layers.ground_temp, val === maxTg, val === minTg);
+            createRectMarker(latLng, props.Tg, '°C', getTemperatureStyle(props.Tg).bg, popupContent, layers.ground_temp, val === maxTg, val === minTg);
         }
         if (props.Tmin_hour !== undefined && props.Tmin_hour !== null) {
             const val = parseFloat(props.Tmin_hour);
-            createRectMarker(latLng, props.Tmin_hour, '°C', getTemperatureStyle(props.Tmin_hour).bg, `<b>${name}</b><br>Tmin: ${val.toFixed(1)}°C`, layers.tmin, val === maxTmin, val === minTmin);
+            createRectMarker(latLng, props.Tmin_hour, '°C', getTemperatureStyle(props.Tmin_hour).bg, popupContent, layers.tmin, val === maxTmin, val === minTmin);
         }
         if (props.Tmax_hour !== undefined && props.Tmax_hour !== null) {
             const val = parseFloat(props.Tmax_hour);
-            createRectMarker(latLng, props.Tmax_hour, '°C', getTemperatureStyle(props.Tmax_hour).bg, `<b>${name}</b><br>Tmax: ${val.toFixed(1)}°C`, layers.tmax, val === maxTmax, val === minTmax);
+            createRectMarker(latLng, props.Tmax_hour, '°C', getTemperatureStyle(props.Tmax_hour).bg, popupContent, layers.tmax, val === maxTmax, val === minTmax);
         }
         if (props.Wind_avg !== undefined && props.Wind_avg !== null) {
-            createRectMarker(latLng, props.Wind_avg, ' m/s', '#e2e8f0', `<b>${name}</b><br>Wiatr średni: ${parseFloat(props.Wind_avg).toFixed(1)} m/s`, layers.wind);
+            createRectMarker(latLng, props.Wind_avg, ' m/s', '#e2e8f0', popupContent, layers.wind);
         }
         if (props.Wind_max !== undefined && props.Wind_max !== null) {
-            createRectMarker(latLng, props.Wind_max, ' m/s', '#fca5a5', `<b>${name}</b><br>Poryw: ${parseFloat(props.Wind_max).toFixed(1)} m/s`, layers.wind_max);
+            createRectMarker(latLng, props.Wind_max, ' m/s', '#fca5a5', popupContent, layers.wind_max);
         }
         if (props.Precip_24h !== undefined && props.Precip_24h !== null && props.Precip_24h > 0) {
-            createRectMarker(latLng, props.Precip_24h, ' mm', getPrecipColor(props.Precip_24h), `<b>${name}</b><br>Opad: ${parseFloat(props.Precip_24h).toFixed(1)} mm`, layers.precipitation);
+            createRectMarker(latLng, props.Precip_24h, ' mm', getPrecipColor(props.Precip_24h), popupContent, layers.precipitation);
         }
     });
 }
 
-// 🔄 ODWRÓCONA LEGENDA - Ciepłe na górze, zimne na dole
 function dodajLegende() {
     const legend = L.control({ position: 'bottomright' });
     legend.onAdd = function () {
         const div = L.DomUtil.create('div', 'info legend');
         div.innerHTML = '<h4>Meteo Ta</h4>';
-        
-        // Tablica ułożona malejąco, by wysokie temperatury były u góry
         const displayPoints = [35, 30, 25, 20, 15, 10, 5, 0, -5, -10, -20, -30];
-        
         displayPoints.forEach(pt => {
             const style = getTemperatureStyle(pt);
             div.innerHTML += `
@@ -190,28 +212,61 @@ function dodajLegende() {
     legend.addTo(map);
 }
 
-function ustawSuwakCzasu() {
-    const slider = document.getElementById('date-picker');
-    const label = document.getElementById('current-time-label');
-    if (!slider || !label) return;
+// 🔧 LOGIKA DEKOUPLINGU MINIMALISTYCZNEJ OSI CZASU (Kalendarz + Suwak Godzin)
+function zainicjujMinimalistycznaOs() {
+    const calPicker = document.getElementById('calendar-picker');
+    const hrSlider = document.getElementById('hour-slider');
+    const hrLabel = document.getElementById('current-time-label');
 
-    slider.min = 0; slider.max = dostepneKlucze.length - 1; slider.value = dostepneKlucze.length - 1;
+    // Wyciągamy skrajne daty z bazy do zablokowania min/max w kalendarzu HTML
+    const daty = dostepneKlucze.map(k => k.split('_')[0]);
+    const unikalneDaty = [...new Set(daty)].sort();
+    
+    calPicker.min = unikalneDaty[0];
+    calPicker.max = unikalneDaty[unikalneDaty.length - 1];
 
-    function aktualizujEtykiete(indeks) {
-        const klucz = dostepneKlucze[indeks];
-        if (!klucz) return;
-        const czesci = klucz.split('_');
-        label.innerText = `${czesci[0]} godz. ${czesci[1]}:00`;
+    // Ustawiamy startowo na najnowszy rekord w bazie
+    const najnowszyKlucz = dostepneKlucze[dostepneKlucze.length - 1];
+    const [startData, startGodzina] = najnowszyKlucz.split('_');
+
+    calPicker.value = startData;
+    hrSlider.value = parseInt(startGodzina);
+    hrLabel.innerText = `${startGodzina.padStart(2, '0')}:00`;
+
+    function zaladujZsynchronizowanyPunkt() {
+        const wybranaData = calPicker.value;
+        const wybranaGodzina = hrSlider.value;
+        
+        // Zabezpieczenie przed jedno/dwucyfrowym formatowaniem kluczy w bazie json
+        const k1 = `${wybranaData}_${wybranaGodzina}`;
+        const k2 = `${wybranaData}_${String(wybranaGodzina).padStart(2, '0')}`;
+        
+        let kluczDocelowy = imgwBazaDanych[k1] ? k1 : (imgwBazaDanych[k2] ? k2 : null);
+
+        // Jeśli dla danego dnia nie ma dokładnie tej godziny, szukamy najbliższej dostępnej
+        if (!kluczDocelowy) {
+            const dostepneDlaDnia = dostepneKlucze.filter(k => k.startsWith(wybranaData));
+            if (dostepneDlaDnia.length > 0) {
+                kluczDocelowy = dostepneDlaDnia[0]; // Bierzemy pierwszą dostępną z brzegu
+                const wyznaczonaGodzina = kluczDocelowy.split('_')[1];
+                hrSlider.value = parseInt(wyznaczonaGodzina);
+            }
+        }
+
+        if (kluczDocelowy) {
+            const godzinaWyswietlana = kluczDocelowy.split('_')[1].padStart(2, '0');
+            hrLabel.innerText = `${godzinaWyswietlana}:00`;
+            wyswietlDaneDlaGodziny(kluczDocelowy);
+        }
     }
 
-    aktualizujEtykiete(dostepneKlucze.length - 1);
-    wyswietlDaneDlaGodziny(dostepneKlucze[dostepneKlucze.length - 1]);
-
-    slider.addEventListener('input', function(e) {
-        const indeks = parseInt(e.target.value);
-        aktualizujEtykiete(indeks);
-        wyswietlDaneDlaGodziny(dostepneKlucze[indeks]);
+    calPicker.addEventListener('change', zaladujZsynchronizowanyPunkt);
+    hrSlider.addEventListener('input', function(e) {
+        hrLabel.innerText = `${String(e.target.value).padStart(2, '0')}:00`;
+        zaladujZsynchronizowanyPunkt();
     });
+
+    wyswietlDaneDlaGodziny(najnowszyKlucz);
 }
 
 fetch('imgw_baza.json')
@@ -221,5 +276,6 @@ fetch('imgw_baza.json')
         dostepneKlucze = Object.keys(data).sort();
         if (dostepneKlucze.length === 0) return;
         dodajLegende();
-        ustawSuwakCzasu();
-    });
+        zainicjujMinimalistycznaOs();
+    })
+    .catch(err => console.error("❌ Błąd krytyczny mapy:", err));

@@ -5,7 +5,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors'
 }).addTo(map);
 
-// Wczorajsze warstwy pomiarowe
+// Warstwy pomiarowe
 const layers = {
     temperature: L.layerGroup(),
     ground_temp: L.layerGroup(),
@@ -31,7 +31,7 @@ L.control.layers(null, {
 let imgwBazaDanych = {};
 let dostepneKlucze = [];
 
-// 🎨 WCZORAJSZA 17-PUNKTOWA SKALA Z QGIS DO LINIOWEJ INTERPOLACJI KOŁORÓW
+// 17-punktowa skala z Twojego obrazka QGIS do płynnej interpolacji barw
 const tempScale = [
     { t: -40, r: 245, g: 242, b: 245 }, { t: -35, r: 212, g: 185, b: 204 }, { t: -30, r: 125, g: 90,  b: 110 }, 
     { t: -25, r: 214, g: 110, b: 247 }, { t: -20, r: 135, g: 45,  b: 230 }, { t: -15, r: 40,  g: 30,  b: 215 }, 
@@ -41,17 +41,12 @@ const tempScale = [
     { t: 35,  r: 180, g: 25,  b: 45  }, { t: 40,  r: 245, g: 150, b: 180 }
 ];
 
-// Wczorajsza funkcja wyliczająca płynne przejścia kolorystyczne RGB (zgodnie z obrazkiem z QGIS)
 function getTemperatureStyle(temp) {
     let t = parseFloat(temp);
     if (isNaN(t)) return { bg: 'rgba(230, 233, 234, 0.98)' };
     
-    if (t <= tempScale[0].t) {
-        return { bg: `rgba(${tempScale[0].r}, ${tempScale[0].g}, ${tempScale[0].b}, 0.98)` };
-    }
-    if (t >= tempScale[tempScale.length - 1].t) {
-        return { bg: `rgba(${tempScale[tempScale.length - 1].r}, ${tempScale[tempScale.length - 1].g}, ${tempScale[tempScale.length - 1].b}, 0.98)` };
-    }
+    if (t <= tempScale[0].t) return { bg: `rgba(${tempScale[0].r}, ${tempScale[0].g}, ${tempScale[0].b}, 0.98)` };
+    if (t >= tempScale[tempScale.length - 1].t) return { bg: `rgba(${tempScale[tempScale.length - 1].r}, ${tempScale[tempScale.length - 1].g}, ${tempScale[tempScale.length - 1].b}, 0.98)` };
 
     let lower = tempScale[0], upper = tempScale[tempScale.length - 1];
     for (let i = 0; i < tempScale.length - 1; i++) {
@@ -70,7 +65,6 @@ function getTemperatureStyle(temp) {
     return { bg: `rgba(${r}, ${g}, ${b}, 0.98)` };
 }
 
-// Skala opadów
 function getPrecipColor(p) {
     if (p === null || p === undefined || p === 0) return '#ffffff00';
     return p < 0.5 ? '#b3e5fc' :
@@ -79,26 +73,29 @@ function getPrecipColor(p) {
            p < 15  ? '#01579b' : '#021a42';
 }
 
-// Generowanie markerów: mała kropka + prostokąt z offsetem [-6, 12] i wymuszonym .toFixed(1)
+// Funkcja tworząca kompozycję z Twojego rysunku: Kropka po lewej stronie, wewnątrz etykiety
 function createRectMarker(latLng, value, unit, bgColor, popupText, layerGroup) {
     const formattedValue = parseFloat(value).toFixed(1);
     
-    // Punkt bazowy stacji
-    L.circleMarker(latLng, { radius: 3, fillColor: '#111', color: '#111', weight: 1, fillOpacity: 1 })
-        .bindPopup(popupText)
-        .addTo(layerGroup);
+    // 🟢 Zielony punkt stacji (dokładnie taki mały punkt-kotwica jak na mapie)
+    L.circleMarker(latLng, { 
+        radius: 3, 
+        fillColor: '#24b14c', 
+        color: '#1b8539', 
+        weight: 1, 
+        fillOpacity: 1 
+    }).bindPopup(popupText).addTo(layerGroup);
 
-    // Etykieta prostokątna Felt style
+    // Prostokąt danych nałożony tak, by kropka była idealnie przy jego lewej krawędzi
     L.marker(latLng, {
         icon: L.divIcon({
             className: 'gis-rect-label',
-            html: `<div class="gis-rect-box" style="background-color: ${bgColor};">${formattedValue}${unit}</div>`,
-            iconAnchor: [-6, 12] // Dokładny wczorajszy offset od kropki
+            html: `<div class="gis-rect-box" style="background-color: ${bgColor}; font-family: Arial, sans-serif;">${formattedValue}${unit}</div>`,
+            iconAnchor: [6, 9] // Skalowanie: kropka ląduje z lewej strony prostokąta
         })
     }).bindPopup(popupText).addTo(layerGroup);
 }
 
-// Renderowanie danych z bazy imgw_baza.json
 function wyswietlDaneDlaGodziny(klucz) {
     Object.values(layers).forEach(lg => lg.clearLayers());
     const stacje = imgwBazaDanych[klucz];
@@ -110,57 +107,42 @@ function wyswietlDaneDlaGodziny(klucz) {
         const props = stacja.properties;
         const name = props.Station_name || "Stacja synoptyczna";
 
-        // 1. Temperatura powietrza (Ta)
+        // Używamy pełnego "°C" zgodnie z obrazkiem
         if (props.Ta !== undefined && props.Ta !== null) {
             const style = getTemperatureStyle(props.Ta);
-            createRectMarker(latLng, props.Ta, '°', style.bg, `<b>${name}</b><br>Temperatura powietrza: ${parseFloat(props.Ta).toFixed(1)}°C`, layers.temperature);
+            createRectMarker(latLng, props.Ta, '°C', style.bg, `<b>${name}</b><br>Temperatura powietrza: ${parseFloat(props.Ta).toFixed(1)}°C`, layers.temperature);
         }
-
-        // 2. Temperatura przy gruncie (Tg)
         if (props.Tg !== undefined && props.Tg !== null) {
             const style = getTemperatureStyle(props.Tg);
-            createRectMarker(latLng, props.Tg, '°', style.bg, `<b>${name}</b><br>Temperatura przy gruncie: ${parseFloat(props.Tg).toFixed(1)}°C`, layers.ground_temp);
+            createRectMarker(latLng, props.Tg, '°C', style.bg, `<b>${name}</b><br>Temperatura przy gruncie: ${parseFloat(props.Tg).toFixed(1)}°C`, layers.ground_temp);
         }
-
-        // 3. Temperatura minimalna (Tmin)
         if (props.Tmin_hour !== undefined && props.Tmin_hour !== null) {
             const style = getTemperatureStyle(props.Tmin_hour);
-            createRectMarker(latLng, props.Tmin_hour, '°', style.bg, `<b>${name}</b><br>Temperatura minimalna: ${parseFloat(props.Tmin_hour).toFixed(1)}°C`, layers.tmin);
+            createRectMarker(latLng, props.Tmin_hour, '°C', style.bg, `<b>${name}</b><br>Temperatura minimalna: ${parseFloat(props.Tmin_hour).toFixed(1)}°C`, layers.tmin);
         }
-
-        // 4. Temperatura maksymalna (Tmax)
         if (props.Tmax_hour !== undefined && props.Tmax_hour !== null) {
             const style = getTemperatureStyle(props.Tmax_hour);
-            createRectMarker(latLng, props.Tmax_hour, '°', style.bg, `<b>${name}</b><br>Temperatura maksymalna: ${parseFloat(props.Tmax_hour).toFixed(1)}°C`, layers.tmax);
+            createRectMarker(latLng, props.Tmax_hour, '°C', style.bg, `<b>${name}</b><br>Temperatura maksymalna: ${parseFloat(props.Tmax_hour).toFixed(1)}°C`, layers.tmax);
         }
-
-        // 5. Średnia prędkość wiatru
         if (props.Wind_avg !== undefined && props.Wind_avg !== null) {
-            createRectMarker(latLng, props.Wind_avg, ' <span style="font-size:7px">m/s</span>', '#e2e8f0', `<b>${name}</b><br>Średnia prędkość wiatru: ${parseFloat(props.Wind_avg).toFixed(1)} m/s`, layers.wind);
+            createRectMarker(latLng, props.Wind_avg, ' m/s', '#e2e8f0', `<b>${name}</b><br>Średnia prędkość wiatru: ${parseFloat(props.Wind_avg).toFixed(1)} m/s`, layers.wind);
         }
-
-        // 6. Porywy wiatru
         if (props.Wind_max !== undefined && props.Wind_max !== null) {
-            createRectMarker(latLng, props.Wind_max, ' <span style="font-size:7px">m/s</span>', '#fca5a5', `<b>${name}</b><br>Maksymalny poryw wiatru: ${parseFloat(props.Wind_max).toFixed(1)} m/s`, layers.wind_max);
+            createRectMarker(latLng, props.Wind_max, ' m/s', '#fca5a5', `<b>${name}</b><br>Maksymalny poryw wiatru: ${parseFloat(props.Wind_max).toFixed(1)} m/s`, layers.wind_max);
         }
-
-        // 7. Suma opadu (24h)
         if (props.Precip_24h !== undefined && props.Precip_24h !== null && props.Precip_24h > 0) {
-            createRectMarker(latLng, props.Precip_24h, ' <span style="font-size:7px">mm</span>', getPrecipColor(props.Precip_24h), `<b>${name}</b><br>Suma opadu (24h): ${parseFloat(props.Precip_24h).toFixed(1)} mm`, layers.precipitation);
+            createRectMarker(latLng, props.Precip_24h, ' mm', getPrecipColor(props.Precip_24h), `<b>${name}</b><br>Suma opadu (24h): ${parseFloat(props.Precip_24h).toFixed(1)} mm`, layers.precipitation);
         }
     });
 }
 
-// Generowanie wczorajszej pionowej legendy termicznej na bazie punktów węzłowych skali
 function dodajLegende() {
     const legend = L.control({ position: 'bottomright' });
     legend.onAdd = function () {
         const div = L.DomUtil.create('div', 'info legend');
         div.innerHTML = '<h4>Meteo Ta</h4>';
         
-        // Wybieramy kluczowe punkty węzłowe do legendy co 5/10 stopni, żeby była czytelna i pionowa
         const displayPoints = [-30, -20, -10, -5, 0, 5, 10, 15, 20, 25, 30, 35];
-        
         displayPoints.forEach(pt => {
             const style = getTemperatureStyle(pt);
             div.innerHTML += `
@@ -175,7 +157,6 @@ function dodajLegende() {
     legend.addTo(map);
 }
 
-// Powiązanie suwaka z chronologicznymi wpisami bazy danych
 function ustawSuwakCzasu() {
     const slider = document.getElementById('date-picker');
     const label = document.getElementById('current-time-label');
@@ -203,7 +184,6 @@ function ustawSuwakCzasu() {
     });
 }
 
-// Inicjalizacja pobierania danych
 console.log("Wczytywanie zintegrowanej bazy godzinowej...");
 fetch('imgw_baza.json')
     .then(res => {

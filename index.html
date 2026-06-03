@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Automatyczna Mapa Pogodowa IMGW</title>
+    <title>Mapa Pogodowa IMGW - Wersja Stabilna</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -13,122 +13,64 @@
             padding: 0;
             width: 100%;
             height: 100%;
-            font-family: 'Helvetica Neue', Arial, Helvetica, sans-serif;
+            font-family: Arial, sans-serif;
             background-color: #b5d0d0;
         }
 
-        /* 📅 Szeroka, nowoczesna i ciągła oś czasu */
         #timeline-container {
             position: absolute;
             bottom: 30px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(255, 255, 255, 0.96);
+            background: rgba(255, 255, 255, 0.95);
             color: #222;
-            padding: 12px 24px;
-            border-radius: 30px;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+            padding: 10px 20px;
+            border-radius: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
             z-index: 1000;
             display: flex;
             align-items: center;
-            gap: 16px;
-            font-size: 12px;
-            border: 1px solid #cbd5e1;
+            gap: 15px;
             width: 80%;
-            max-width: 900px;
-            box-sizing: border-box;
+            max-width: 800px;
         }
 
         #timeline-slider {
             flex-grow: 1;
             cursor: pointer;
-            accent-color: #1e293b;
-            margin: 0;
-            height: 6px;
         }
 
         #current-time-label {
             font-weight: bold;
-            font-variant-numeric: tabular-nums;
-            background: #1e293b;
-            color: #ffffff;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            white-space: nowrap;
-            box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
-        }
-
-        .source-attribution {
-            font-size: 11px;
-            color: #64748b;
-            border-left: 1px solid #cbd5e1;
-            padding-left: 16px;
-            font-weight: bold;
+            background: #222;
+            color: #fff;
+            padding: 4px 10px;
+            border-radius: 10px;
             white-space: nowrap;
         }
 
-        /* 🎚️ Panel przezroczystości podkładu */
-        .opacity-control-panel {
-            background: rgba(255, 255, 255, 0.96);
-            padding: 8px 12px;
-            border-radius: 6px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-            font-size: 11px;
-            font-weight: bold;
-            color: #222;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            border: 1px solid #cbd5e1;
-        }
-        
-        .opacity-control-panel input {
-            cursor: pointer;
-            accent-color: #222;
-            width: 80px;
-            margin: 0;
-        }
-
-        /* 🎨 Uniwersalna legenda termiczna co 5°C */
         .info.legend {
-            background: rgba(255, 255, 255, 0.96);
-            padding: 10px 14px;
-            font-size: 11px;
-            line-height: 13px;
-            color: #222;
-            border-radius: 6px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-            font-weight: 600;
-            border: 1px solid #cbd5e1;
-            max-height: 70vh;
-            overflow-y: auto;
-        }
-        
-        .info.legend h4 {
-            margin: 0 0 6px 0;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.2);
             font-size: 12px;
-            font-weight: bold;
-            border-bottom: 1.5px solid #e2e8f0;
-            padding-bottom: 4px;
-            text-align: center;
+            line-height: 18px;
         }
 
         .legend-row {
             display: flex;
             align-items: center;
-            margin-bottom: 1px;
+            margin-bottom: 2px;
         }
 
         .legend-color-box {
-            width: 16px;
-            height: 11px;
+            width: 20px;
+            height: 12px;
             margin-right: 8px;
-            border: 1px solid rgba(0,0,0,0.15);
-            border-radius: 2px;
+            border: 1px solid #999;
         }
 
-        /* 🏷️ Ramki danych (styl Felt/QGIS) */
         .gis-rect-label {
             background: none !important;
             border: none !important;
@@ -140,41 +82,22 @@
             justify-content: center;
             font-size: 11px;
             font-weight: bold;
-            color: #000000;
-            padding: 1px 4px;
+            color: #000;
+            padding: 2px 4px;
             border-radius: 3px;
-            border: 1.2px solid #222222;
-            box-shadow: 0 1.5px 3px rgba(0,0,0,0.3);
-            text-align: center;
+            border: 1px solid #333;
+            background: white;
             white-space: nowrap;
-            min-width: 38px;
-            height: 17px;
-            box-sizing: border-box;
-        }
-
-        /* Krajowe ekstrema godzinowe */
-        .gis-rect-box.extreme-max {
-            border: 2.5px solid #d32f2f !important;
-            box-shadow: 0 0 6px rgba(211, 47, 47, 0.8);
-        }
-
-        .gis-rect-box.extreme-min {
-            border: 2.5px solid #1976d2 !important;
-            box-shadow: 0 0 6px rgba(25, 118, 210, 0.8);
         }
 
         .meteo-popup-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 11px;
-            margin-top: 5px;
         }
         .meteo-popup-table td {
             padding: 2px 4px;
-            border-bottom: 1px solid #f1f5f9;
-        }
-        .meteo-popup-table tr:last-child td {
-            border-bottom: none;
+            border-bottom: 1px solid #eee;
         }
     </style>
 </head>
@@ -186,7 +109,6 @@
         <b>Oś czasu:</b>
         <input type="range" id="timeline-slider" min="0" max="0" value="0">
         <span id="current-time-label">Wczytywanie...</span>
-        <div class="source-attribution">Źródło danych: IMGW-PIB</div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

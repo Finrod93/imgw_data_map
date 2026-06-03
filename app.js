@@ -6,7 +6,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors'
 }).addTo(map);
 
-// Przywrócenie kompletnej listy warstw pomiarowych
+// Kompletna wczorajsza lista warstw pomiarowych
 const layers = {
     temperature: L.layerGroup(),
     ground_temp: L.layerGroup(),
@@ -17,10 +17,10 @@ const layers = {
     precipitation: L.layerGroup()
 };
 
-// Domyślnie na start włączamy temperaturę powietrza
+// Startowa warstwa
 layers.temperature.addTo(map);
 
-// Kompletne menu wyboru warstw (po prawej stronie)
+// Menu wyboru warstw z zachowaniem wczorajszych nazw i struktur
 L.control.layers(null, {
     "Temperatura powietrza (Ta)": layers.temperature,
     "Temperatura przy gruncie (Tg)": layers.ground_temp,
@@ -34,7 +34,7 @@ L.control.layers(null, {
 let imgwBazaDanych = {};
 let dostepneKlucze = [];
 
-// Oryginalna paleta kolorów dla temperatur
+// Oryginalna wczorajsza paleta barw (Felt/QGIS style)
 function getTempColor(t) {
     if (t === null || t === undefined) return '#808080';
     return t < -15 ? '#03022c' :
@@ -49,7 +49,7 @@ function getTempColor(t) {
            t < 27  ? '#ff4500' : '#b22222';
 }
 
-// Kolory dla warstwy opadów
+// Oryginalna wczorajsza paleta opadów
 function getPrecipColor(p) {
     if (p === null || p === undefined || p === 0) return '#ffffff00';
     return p < 0.5 ? '#b3e5fc' :
@@ -58,11 +58,35 @@ function getPrecipColor(p) {
            p < 15  ? '#01579b' : '#021a42';
 }
 
-// Funkcja nanosząca punkty i ETYKIETY tekstowe bezpośrednio na mapę
-function wyswietlDaneDlaGodziny(klucz) {
-    // Czyszczenie wszystkich warstw przed nowym rysowaniem
-    Object.values(layers).forEach(lg => lg.clearLayers());
+// Sprawdzenie kontrastu tekstu
+function useLightText(color) {
+    const darkColors = ['#03022c', '#00008b', '#2a52be', '#01579b', '#021a42', '#b22222'];
+    return darkColors.includes(color);
+}
 
+// Wczorajsza funkcja rysująca: mały punkt-kotwica + prostokąt z offsetem i 1 miejscem po przecinku
+function createRectMarker(latLng, value, unit, bgColor, popupText, layerGroup) {
+    const formattedValue = parseFloat(value).toFixed(1);
+    const textClass = useLightText(bgColor) ? 'gis-rect-box light-text' : 'gis-rect-box';
+    
+    // Wczorajsza mała kropka bazowa stacji
+    L.circleMarker(latLng, { radius: 3, fillColor: '#111', color: '#111', weight: 1, fillOpacity: 1 })
+        .bindPopup(popupText)
+        .addTo(layerGroup);
+
+    // Wczorajszy prostokąt z dokładnie dobranym odsunieciem [-6, 12]
+    L.marker(latLng, {
+        icon: L.divIcon({
+            className: 'gis-rect-label',
+            html: `<div class="${textClass}" style="background-color: ${bgColor};">${formattedValue}${unit}</div>`,
+            iconAnchor: [-6, 12]
+        })
+    }).bindPopup(popupText).addTo(layerGroup);
+}
+
+// Mapowanie danych z bazy zbiorczej
+function wyswietlDaneDlaGodziny(klucz) {
+    Object.values(layers).forEach(lg => lg.clearLayers());
     const stacje = imgwBazaDanych[klucz];
     if (!stacje) return;
 
@@ -72,87 +96,44 @@ function wyswietlDaneDlaGodziny(klucz) {
         const props = stacja.properties;
         const name = props.Station_name || "Stacja synoptyczna";
 
-        // 1. Warstwa: Temperatura powietrza (Ta) + Etykieta tekstowa na mapie
+        // 1. Temperatura powietrza (Ta)
         if (props.Ta !== undefined && props.Ta !== null) {
-            L.circleMarker(latLng, { radius: 7, fillColor: getTempColor(props.Ta), color: '#000', weight: 1, fillOpacity: 0.85 })
-                .bindPopup(`<b>${name}</b><br>Temperatura powietrza: ${props.Ta}°C`)
-                .addTo(layers.temperature);
-            
-            // Wyświetlanie wartości bezpośrednio na mapie (jak w QGIS/Felt)
-            L.marker(latLng, {
-                icon: L.divIcon({ className: 'station-value-label', html: `${props.Ta}°`, iconAnchor: [-10, 10] })
-            }).addTo(layers.temperature);
+            createRectMarker(latLng, props.Ta, '°', getTempColor(props.Ta), `<b>${name}</b><br>Temperatura powietrza: ${parseFloat(props.Ta).toFixed(1)}°C`, layers.temperature);
         }
 
-        // 2. Warstwa: Temperatura przy gruncie (Tg) + Etykieta
+        // 2. Temperatura przy gruncie (Tg)
         if (props.Tg !== undefined && props.Tg !== null) {
-            L.circleMarker(latLng, { radius: 7, fillColor: getTempColor(props.Tg), color: '#5c4033', weight: 1, fillOpacity: 0.85 })
-                .bindPopup(`<b>${name}</b><br>Temperatura przy gruncie: ${props.Tg}°C`)
-                .addTo(layers.ground_temp);
-
-            L.marker(latLng, {
-                icon: L.divIcon({ className: 'station-value-label', html: `${props.Tg}°`, iconAnchor: [-10, 10] })
-            }).addTo(layers.ground_temp);
+            createRectMarker(latLng, props.Tg, '°', getTempColor(props.Tg), `<b>${name}</b><br>Temperatura przy gruncie: ${parseFloat(props.Tg).toFixed(1)}°C`, layers.ground_temp);
         }
 
-        // 3. Warstwa: Temperatura minimalna (Tmin_hour) + Etykieta
+        // 3. Temperatura minimalna (Tmin)
         if (props.Tmin_hour !== undefined && props.Tmin_hour !== null) {
-            L.circleMarker(latLng, { radius: 6, fillColor: getTempColor(props.Tmin_hour), color: '#0000ff', weight: 1, fillOpacity: 0.8 })
-                .bindPopup(`<b>${name}</b><br>Temperatura minimalna z godziny: ${props.Tmin_hour}°C`)
-                .addTo(layers.tmin);
-
-            L.marker(latLng, {
-                icon: L.divIcon({ className: 'station-value-label', html: `${props.Tmin_hour}°`, iconAnchor: [-10, 10] })
-            }).addTo(layers.tmin);
+            createRectMarker(latLng, props.Tmin_hour, '°', getTempColor(props.Tmin_hour), `<b>${name}</b><br>Temperatura minimalna: ${parseFloat(props.Tmin_hour).toFixed(1)}°C`, layers.tmin);
         }
 
-        // 4. Warstwa: Temperatura maksymalna (Tmax_hour) + Etykieta
+        // 4. Temperatura maksymalna (Tmax)
         if (props.Tmax_hour !== undefined && props.Tmax_hour !== null) {
-            L.circleMarker(latLng, { radius: 6, fillColor: getTempColor(props.Tmax_hour), color: '#ff0000', weight: 1, fillOpacity: 0.8 })
-                .bindPopup(`<b>${name}</b><br>Temperatura maksymalna z godziny: ${props.Tmax_hour}°C`)
-                .addTo(layers.tmax);
-
-            L.marker(latLng, {
-                icon: L.divIcon({ className: 'station-value-label', html: `${props.Tmax_hour}°`, iconAnchor: [-10, 10] })
-            }).addTo(layers.tmax);
+            createRectMarker(latLng, props.Tmax_hour, '°', getTempColor(props.Tmax_hour), `<b>${name}</b><br>Temperatura maksymalna: ${parseFloat(props.Tmax_hour).toFixed(1)}°C`, layers.tmax);
         }
 
-        // 5. Warstwa: Średnia prędkość wiatru
+        // 5. Średnia prędkość wiatru
         if (props.Wind_avg !== undefined && props.Wind_avg !== null) {
-            L.circleMarker(latLng, { radius: 6, fillColor: '#cbd5e1', color: '#475569', weight: 1, fillOpacity: 0.8 })
-                .bindPopup(`<b>${name}</b><br>Średnia prędkość wiatru: ${props.Wind_avg} m/s`)
-                .addTo(layers.wind);
-
-            L.marker(latLng, {
-                icon: L.divIcon({ className: 'station-value-label', html: `${props.Wind_avg}<span style="font-size:8px">m/s</span>`, iconAnchor: [-10, 10] })
-            }).addTo(layers.wind);
+            createRectMarker(latLng, props.Wind_avg, ' <span style="font-size:7px">m/s</span>', '#e2e8f0', `<b>${name}</b><br>Średnia prędkość wiatru: ${parseFloat(props.Wind_avg).toFixed(1)} m/s`, layers.wind);
         }
 
-        // 6. Warstwa: Porywy wiatru
+        // 6. Porywy wiatru
         if (props.Wind_max !== undefined && props.Wind_max !== null) {
-            L.circleMarker(latLng, { radius: 6, fillColor: '#fca5a5', color: '#b91c1c', weight: 1, fillOpacity: 0.8 })
-                .bindPopup(`<b>${name}</b><br>Maksymalny poryw wiatru: ${props.Wind_max} m/s`)
-                .addTo(layers.wind_max);
-
-            L.marker(latLng, {
-                icon: L.divIcon({ className: 'station-value-label', html: `${props.Wind_max}<span style="font-size:8px">m/s</span>`, iconAnchor: [-10, 10] })
-            }).addTo(layers.wind_max);
+            createRectMarker(latLng, props.Wind_max, ' <span style="font-size:7px">m/s</span>', '#fca5a5', `<b>${name}</b><br>Maksymalny poryw wiatru: ${parseFloat(props.Wind_max).toFixed(1)} m/s`, layers.wind_max);
         }
 
-        // 7. Warstwa: Suma opadu (24h)
+        // 7. Suma opadu (24h)
         if (props.Precip_24h !== undefined && props.Precip_24h !== null && props.Precip_24h > 0) {
-            L.circleMarker(latLng, { radius: 7, fillColor: getPrecipColor(props.Precip_24h), color: '#0369a1', weight: 1, fillOpacity: 0.85 })
-                .bindPopup(`<b>${name}</b><br>Suma opadu (24h): ${props.Precip_24h} mm`)
-                .addTo(layers.precipitation);
-
-            L.marker(latLng, {
-                icon: L.divIcon({ className: 'station-value-label', html: `${props.Precip_24h}<span style="font-size:8px">mm</span>`, iconAnchor: [-10, 10] })
-            }).addTo(layers.precipitation);
+            createRectMarker(latLng, props.Precip_24h, ' <span style="font-size:7px">mm</span>', getPrecipColor(props.Precip_24h), `<b>${name}</b><br>Suma opadu (24h): ${parseFloat(props.Precip_24h).toFixed(1)} mm`, layers.precipitation);
         }
     });
 }
 
-// Przywrócenie czytelnej, poprawnej Legendy w prawym dolnym rogu
+// Przywrócenie wczorajszej legendy w prawym dolnym rogu
 function dodajLegende() {
     const legend = L.control({ position: 'bottomright' });
     legend.onAdd = function () {
@@ -176,7 +157,7 @@ function dodajLegende() {
     legend.addTo(map);
 }
 
-// Konfiguracja suwaka czasu
+// Współpraca suwaka z poprawną chronologią kluczy bazy danych
 function ustawSuwakCzasu() {
     const slider = document.getElementById('date-picker');
     const label = document.getElementById('current-time-label');
@@ -185,8 +166,7 @@ function ustawSuwakCzasu() {
 
     slider.min = 0;
     slider.max = dostepneKlucze.length - 1;
-    const najnowszyIndeks = dostepneKlucze.length - 1;
-    slider.value = najnowszyIndeks;
+    slider.value = dostepneKlucze.length - 1;
 
     function aktualizujEtykiete(indeks) {
         const klucz = dostepneKlucze[indeks];
@@ -195,8 +175,8 @@ function ustawSuwakCzasu() {
         label.innerText = `${czesci[0]} godz. ${czesci[1]}:00`;
     }
 
-    aktualizujEtykiete(najnowszyIndeks);
-    wyswietlDaneDlaGodziny(dostepneKlucze[najnowszyIndeks]);
+    aktualizujEtykiete(dostepneKlucze.length - 1);
+    wyswietlDaneDlaGodziny(dostepneKlucze[dostepneKlucze.length - 1]);
 
     slider.addEventListener('input', function(e) {
         const indeks = parseInt(e.target.value);
@@ -205,7 +185,7 @@ function ustawSuwakCzasu() {
     });
 }
 
-// Pobieranie bazy danych
+// Pobieranie stabilnej bazy godzinowej JSON
 console.log("Rozpoczynam pobieranie pliku imgw_baza.json...");
 fetch('imgw_baza.json')
     .then(res => {
@@ -215,7 +195,6 @@ fetch('imgw_baza.json')
     .then(data => {
         imgwBazaDanych = data;
         dostepneKlucze = Object.keys(data).sort();
-
         if (dostepneKlucze.length === 0) return;
 
         dodajLegende();

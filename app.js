@@ -1,12 +1,11 @@
 // Inicjalizacja mapy Leaflet na Polskę
 const map = L.map('map').setView([52.0689, 19.4797], 6);
 
-// Podkład mapy
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors'
 }).addTo(map);
 
-// Kompletna wczorajsza lista warstw pomiarowych
+// Wczorajsze warstwy pomiarowe
 const layers = {
     temperature: L.layerGroup(),
     ground_temp: L.layerGroup(),
@@ -17,10 +16,8 @@ const layers = {
     precipitation: L.layerGroup()
 };
 
-// Startowa warstwa
 layers.temperature.addTo(map);
 
-// Menu wyboru warstw z zachowaniem wczorajszych nazw i struktur
 L.control.layers(null, {
     "Temperatura powietrza (Ta)": layers.temperature,
     "Temperatura przy gruncie (Tg)": layers.ground_temp,
@@ -34,22 +31,46 @@ L.control.layers(null, {
 let imgwBazaDanych = {};
 let dostepneKlucze = [];
 
-// Oryginalna wczorajsza paleta barw (Felt/QGIS style)
-function getTempColor(t) {
-    if (t === null || t === undefined) return '#808080';
-    return t < -15 ? '#03022c' :
-           t < -10 ? '#00008b' :
-           t < -5  ? '#2a52be' :
-           t < 0   ? '#4169e1' :
-           t < 3   ? '#6baed6' :
-           t < 7   ? '#add8e6' :
-           t < 12  ? '#90ee90' :
-           t < 17  ? '#228b22' :
-           t < 22  ? '#ffa500' :
-           t < 27  ? '#ff4500' : '#b22222';
+// 🎨 WCZORAJSZA 17-PUNKTOWA SKALA Z QGIS DO LINIOWEJ INTERPOLACJI KOŁORÓW
+const tempScale = [
+    { t: -40, r: 245, g: 242, b: 245 }, { t: -35, r: 212, g: 185, b: 204 }, { t: -30, r: 125, g: 90,  b: 110 }, 
+    { t: -25, r: 214, g: 110, b: 247 }, { t: -20, r: 135, g: 45,  b: 230 }, { t: -15, r: 40,  g: 30,  b: 215 }, 
+    { t: -10, r: 50,  g: 100, b: 230 }, { t: -5,  r: 120, g: 190, b: 245 }, { t: 0,   r: 195, g: 255, b: 250 }, 
+    { t: 5,   r: 120, g: 235, b: 160 }, { t: 10,  r: 55,  g: 160, b: 50  }, { t: 15,  r: 175, g: 215, b: 65  }, 
+    { t: 20,  r: 255, g: 245, b: 50  }, { t: 25,  r: 255, g: 165, b: 40  }, { t: 30,  r: 255, g: 50,  b: 40  }, 
+    { t: 35,  r: 180, g: 25,  b: 45  }, { t: 40,  r: 245, g: 150, b: 180 }
+];
+
+// Wczorajsza funkcja wyliczająca płynne przejścia kolorystyczne RGB (zgodnie z obrazkiem z QGIS)
+function getTemperatureStyle(temp) {
+    let t = parseFloat(temp);
+    if (isNaN(t)) return { bg: 'rgba(230, 233, 234, 0.98)' };
+    
+    if (t <= tempScale[0].t) {
+        return { bg: `rgba(${tempScale[0].r}, ${tempScale[0].g}, ${tempScale[0].b}, 0.98)` };
+    }
+    if (t >= tempScale[tempScale.length - 1].t) {
+        return { bg: `rgba(${tempScale[tempScale.length - 1].r}, ${tempScale[tempScale.length - 1].g}, ${tempScale[tempScale.length - 1].b}, 0.98)` };
+    }
+
+    let lower = tempScale[0], upper = tempScale[tempScale.length - 1];
+    for (let i = 0; i < tempScale.length - 1; i++) {
+        if (t >= tempScale[i].t && t <= tempScale[i+1].t) {
+            lower = tempScale[i];
+            upper = tempScale[i+1];
+            break;
+        }
+    }
+    
+    const fraction = (t - lower.t) / (upper.t - lower.t);
+    const r = Math.round(lower.r + fraction * (upper.r - lower.r));
+    const g = Math.round(lower.g + fraction * (upper.g - lower.g));
+    const b = Math.round(lower.b + fraction * (upper.b - lower.b));
+    
+    return { bg: `rgba(${r}, ${g}, ${b}, 0.98)` };
 }
 
-// Oryginalna wczorajsza paleta opadów
+// Skala opadów
 function getPrecipColor(p) {
     if (p === null || p === undefined || p === 0) return '#ffffff00';
     return p < 0.5 ? '#b3e5fc' :
@@ -58,33 +79,26 @@ function getPrecipColor(p) {
            p < 15  ? '#01579b' : '#021a42';
 }
 
-// Sprawdzenie kontrastu tekstu
-function useLightText(color) {
-    const darkColors = ['#03022c', '#00008b', '#2a52be', '#01579b', '#021a42', '#b22222'];
-    return darkColors.includes(color);
-}
-
-// Wczorajsza funkcja rysująca: mały punkt-kotwica + prostokąt z offsetem i 1 miejscem po przecinku
+// Generowanie markerów: mała kropka + prostokąt z offsetem [-6, 12] i wymuszonym .toFixed(1)
 function createRectMarker(latLng, value, unit, bgColor, popupText, layerGroup) {
     const formattedValue = parseFloat(value).toFixed(1);
-    const textClass = useLightText(bgColor) ? 'gis-rect-box light-text' : 'gis-rect-box';
     
-    // Wczorajsza mała kropka bazowa stacji
+    // Punkt bazowy stacji
     L.circleMarker(latLng, { radius: 3, fillColor: '#111', color: '#111', weight: 1, fillOpacity: 1 })
         .bindPopup(popupText)
         .addTo(layerGroup);
 
-    // Wczorajszy prostokąt z dokładnie dobranym odsunieciem [-6, 12]
+    // Etykieta prostokątna Felt style
     L.marker(latLng, {
         icon: L.divIcon({
             className: 'gis-rect-label',
-            html: `<div class="${textClass}" style="background-color: ${bgColor};">${formattedValue}${unit}</div>`,
-            iconAnchor: [-6, 12]
+            html: `<div class="gis-rect-box" style="background-color: ${bgColor};">${formattedValue}${unit}</div>`,
+            iconAnchor: [-6, 12] // Dokładny wczorajszy offset od kropki
         })
     }).bindPopup(popupText).addTo(layerGroup);
 }
 
-// Mapowanie danych z bazy zbiorczej
+// Renderowanie danych z bazy imgw_baza.json
 function wyswietlDaneDlaGodziny(klucz) {
     Object.values(layers).forEach(lg => lg.clearLayers());
     const stacje = imgwBazaDanych[klucz];
@@ -98,22 +112,26 @@ function wyswietlDaneDlaGodziny(klucz) {
 
         // 1. Temperatura powietrza (Ta)
         if (props.Ta !== undefined && props.Ta !== null) {
-            createRectMarker(latLng, props.Ta, '°', getTempColor(props.Ta), `<b>${name}</b><br>Temperatura powietrza: ${parseFloat(props.Ta).toFixed(1)}°C`, layers.temperature);
+            const style = getTemperatureStyle(props.Ta);
+            createRectMarker(latLng, props.Ta, '°', style.bg, `<b>${name}</b><br>Temperatura powietrza: ${parseFloat(props.Ta).toFixed(1)}°C`, layers.temperature);
         }
 
         // 2. Temperatura przy gruncie (Tg)
         if (props.Tg !== undefined && props.Tg !== null) {
-            createRectMarker(latLng, props.Tg, '°', getTempColor(props.Tg), `<b>${name}</b><br>Temperatura przy gruncie: ${parseFloat(props.Tg).toFixed(1)}°C`, layers.ground_temp);
+            const style = getTemperatureStyle(props.Tg);
+            createRectMarker(latLng, props.Tg, '°', style.bg, `<b>${name}</b><br>Temperatura przy gruncie: ${parseFloat(props.Tg).toFixed(1)}°C`, layers.ground_temp);
         }
 
         // 3. Temperatura minimalna (Tmin)
         if (props.Tmin_hour !== undefined && props.Tmin_hour !== null) {
-            createRectMarker(latLng, props.Tmin_hour, '°', getTempColor(props.Tmin_hour), `<b>${name}</b><br>Temperatura minimalna: ${parseFloat(props.Tmin_hour).toFixed(1)}°C`, layers.tmin);
+            const style = getTemperatureStyle(props.Tmin_hour);
+            createRectMarker(latLng, props.Tmin_hour, '°', style.bg, `<b>${name}</b><br>Temperatura minimalna: ${parseFloat(props.Tmin_hour).toFixed(1)}°C`, layers.tmin);
         }
 
         // 4. Temperatura maksymalna (Tmax)
         if (props.Tmax_hour !== undefined && props.Tmax_hour !== null) {
-            createRectMarker(latLng, props.Tmax_hour, '°', getTempColor(props.Tmax_hour), `<b>${name}</b><br>Temperatura maksymalna: ${parseFloat(props.Tmax_hour).toFixed(1)}°C`, layers.tmax);
+            const style = getTemperatureStyle(props.Tmax_hour);
+            createRectMarker(latLng, props.Tmax_hour, '°', style.bg, `<b>${name}</b><br>Temperatura maksymalna: ${parseFloat(props.Tmax_hour).toFixed(1)}°C`, layers.tmax);
         }
 
         // 5. Średnia prędkość wiatru
@@ -133,31 +151,31 @@ function wyswietlDaneDlaGodziny(klucz) {
     });
 }
 
-// Przywrócenie wczorajszej legendy w prawym dolnym rogu
+// Generowanie wczorajszej pionowej legendy termicznej na bazie punktów węzłowych skali
 function dodajLegende() {
     const legend = L.control({ position: 'bottomright' });
     legend.onAdd = function () {
         const div = L.DomUtil.create('div', 'info legend');
-        const grades = [-15, -10, -5, 0, 3, 7, 12, 17, 22, 27];
-        div.innerHTML = '<h4>Temperatura powietrza</h4>';
+        div.innerHTML = '<h4>Meteo Ta</h4>';
         
-        for (let i = 0; i < grades.length; i++) {
-            const color = getTempColor(grades[i] + 0.5);
-            const labelText = grades[i] + (grades[i + 1] !== undefined ? ' do ' + grades[i + 1] + '°C' : '+°C');
-            
+        // Wybieramy kluczowe punkty węzłowe do legendy co 5/10 stopni, żeby była czytelna i pionowa
+        const displayPoints = [-30, -20, -10, -5, 0, 5, 10, 15, 20, 25, 30, 35];
+        
+        displayPoints.forEach(pt => {
+            const style = getTemperatureStyle(pt);
             div.innerHTML += `
-                <div style="margin-bottom: 3px;">
-                    <div class="legend-color-box" style="background: ${color};"></div>
-                    <span>${labelText}</span>
+                <div class="legend-row">
+                    <div class="legend-color-box" style="background: ${style.bg};"></div>
+                    <span>${pt}°C</span>
                 </div>
             `;
-        }
+        });
         return div;
     };
     legend.addTo(map);
 }
 
-// Współpraca suwaka z poprawną chronologią kluczy bazy danych
+// Powiązanie suwaka z chronologicznymi wpisami bazy danych
 function ustawSuwakCzasu() {
     const slider = document.getElementById('date-picker');
     const label = document.getElementById('current-time-label');
@@ -185,11 +203,11 @@ function ustawSuwakCzasu() {
     });
 }
 
-// Pobieranie stabilnej bazy godzinowej JSON
-console.log("Rozpoczynam pobieranie pliku imgw_baza.json...");
+// Inicjalizacja pobierania danych
+console.log("Wczytywanie zintegrowanej bazy godzinowej...");
 fetch('imgw_baza.json')
     .then(res => {
-        if (!res.ok) throw new Error(`Brak pliku bazy (Status: ${res.status})`);
+        if (!res.ok) throw new Error(`Błąd ładowania bazy`);
         return res.json();
     })
     .then(data => {
@@ -200,4 +218,4 @@ fetch('imgw_baza.json')
         dodajLegende();
         ustawSuwakCzasu();
     })
-    .catch(err => console.error("❌ Błąd krytyczny front-endu:", err));
+    .catch(err => console.error("❌ Błąd front-endu:", err));

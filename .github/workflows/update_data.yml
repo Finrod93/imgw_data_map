@@ -2,11 +2,12 @@ name: Hourly IMGW Data Update
 
 on:
   schedule:
-    - cron: '15 * * * *'  # Odpala siê automatycznie 15 minut po ka¿dej pe³nej godzinie
+    # Odpala siê 15 ORAZ 45 minut po ka¿dej pe³nej godzinie (wiêksza szansa na punktualnoœæ)
+    - cron: '15,45 * * * *'  
   workflow_dispatch:     # Pozwala te¿ uruchomiæ skrypt rêcznie jednym klikniêciem
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true  # Wymuszenie Node.js 24 dla wszystkich akcji
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   update-data:
@@ -26,26 +27,23 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Uruchomienie skryptu pobieraj¹cego dane IMGW
+    - name: Uruchomienie skryptu bazy danych IMGW
       run: python imgw_data.py
 
-    - name: Automatyczny zapis zaktualizowanych danych do repozytorium
+    - name: Automatyczny zapis bazy do repozytorium
       run: |
         git config --global user.name "IMGW Data Bot"
         git config --global user.email "actions@github.com"
         
-        # Sprawdzenie, czy plik geojson w ogóle zosta³ utworzony przez skrypt
-        if [ -f "imgw_data.geojson" ]; then
-          git add imgw_data.geojson
-          
-          # Bezpieczne sprawdzenie czy s¹ zmiany przed zrobieniem commit i push
+        if [ -f "imgw_baza.json" ]; then
+          git add imgw_baza.json
           if ! git diff --cached --quiet; then
-            git commit -m "Aktualizacja danych IMGW: $(date +'%Y-%m-%d %H:%M')"
+            git commit -m "Aktualizacja bazy godzinowej IMGW: $(date +'%Y-%m-%d %H:%M')"
             git push origin main
           else
-            echo "Brak nowych zmian w danych."
+            echo "Brak nowych danych do zapisania."
           fi
         else
-          echo "B£¥D KRYTYCZNY: Plik imgw_data.geojson nie zosta³ utworzony przez skrypt Pythona!"
+          echo "B£¥D: Plik imgw_baza.json nie powsta³ podczas dzia³ania skryptu Pythona."
           exit 1
         fi

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mapa Pogodowa IMGW - Wersja Stabilna</title>
+    <title>Automatyczna Mapa Pogodowa IMGW</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -13,64 +13,49 @@
             padding: 0;
             width: 100%;
             height: 100%;
-            font-family: Arial, sans-serif;
+            font-family: 'Helvetica Neue', Arial, Helvetica, sans-serif;
             background-color: #b5d0d0;
         }
 
-        #timeline-container {
-            position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(255, 255, 255, 0.95);
-            color: #222;
-            padding: 10px 20px;
-            border-radius: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            z-index: 1000;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            width: 80%;
-            max-width: 800px;
-        }
-
-        #timeline-slider {
-            flex-grow: 1;
-            cursor: pointer;
-        }
-
-        #current-time-label {
-            font-weight: bold;
-            background: #222;
-            color: #fff;
-            padding: 4px 10px;
-            border-radius: 10px;
-            white-space: nowrap;
-        }
-
+        /* 🎨 Profesjonalna legenda GIS dla temperatur */
         .info.legend {
-            background: white;
-            padding: 10px;
-            border-radius: 5px;
-            box-shadow: 0 1px 5px rgba(0,0,0,0.2);
+            background: rgba(255, 255, 255, 0.96);
+            padding: 10px 14px;
+            font-size: 11px;
+            line-height: 13px;
+            color: #222;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+            font-weight: 600;
+            border: 1px solid #cbd5e1;
+            max-height: 65vh;
+            overflow-y: auto;
+        }
+        
+        .info.legend h4 {
+            margin: 0 0 6px 0;
             font-size: 12px;
-            line-height: 18px;
+            font-weight: bold;
+            border-bottom: 1.5px solid #e2e8f0;
+            padding-bottom: 4px;
+            text-align: center;
         }
 
         .legend-row {
             display: flex;
             align-items: center;
-            margin-bottom: 2px;
+            margin-bottom: 1px;
         }
 
         .legend-color-box {
-            width: 20px;
-            height: 12px;
+            width: 16px;
+            height: 11px;
             margin-right: 8px;
-            border: 1px solid #999;
+            border: 1px solid rgba(0,0,0,0.15);
+            border-radius: 2px;
         }
 
+        /* 🏷️ Oryginalne etykiety prostokątne GIS */
         .gis-rect-label {
             background: none !important;
             border: none !important;
@@ -82,22 +67,30 @@
             justify-content: center;
             font-size: 11px;
             font-weight: bold;
-            color: #000;
-            padding: 2px 4px;
+            color: #000000;
+            padding: 1px 4px;
             border-radius: 3px;
-            border: 1px solid #333;
-            background: white;
+            border: 1.2px solid #222222;
+            box-shadow: 0 1.5px 3px rgba(0,0,0,0.3);
+            text-align: center;
             white-space: nowrap;
+            min-width: 38px;
+            height: 17px;
+            box-sizing: border-box;
         }
 
         .meteo-popup-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 11px;
+            margin-top: 5px;
         }
         .meteo-popup-table td {
             padding: 2px 4px;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .meteo-popup-table tr:last-child td {
+            border-bottom: none;
         }
     </style>
 </head>
@@ -105,13 +98,7 @@
 
     <div id="map"></div>
 
-    <div id="timeline-container">
-        <b>Oś czasu:</b>
-        <input type="range" id="timeline-slider" min="0" max="0" value="0">
-        <span id="current-time-label">Wczytywanie...</span>
-    </div>
-
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="app.js"></script>
+    <script src="app.js?v=2.0"></script>
 </body>
 </html>

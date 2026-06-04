@@ -2,9 +2,9 @@ name: Hourly IMGW Data Update
 
 on:
   schedule:
-    # Odpala siê 15, 30 ORAZ 45 minut po ka¿dej pe³nej godzinie (wiêksza szansa na punktualnoœæ)
-    - cron: '15,30,45 * * * *'  
-  workflow_dispatch:     # Pozwala te¿ uruchomiæ skrypt rêcznie jednym klikniêciem
+    # Odpala siï¿½ 15 ORAZ 45 minut po kaï¿½dej peï¿½nej godzinie (wiï¿½ksza szansa na punktualnoï¿½ï¿½)
+    - cron: '15,45 * * * *'  
+  workflow_dispatch:     # Pozwala teï¿½ uruchomiï¿½ skrypt rï¿½cznie jednym klikniï¿½ciem
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -34,9 +34,20 @@ jobs:
       run: |
         git config --global user.name "IMGW Data Bot"
         git config --global user.email "actions@github.com"
-        
-        # Dodajemy ca³y folder bazy z plikami dziennymi json
-        git add imgw_baza/
-        
-        # Commit i push zmian do repozytorium, o ile pojawi³y siê nowe dane hourly
-        git diff --quiet && git diff --staged --quiet || (git commit -m "Automatyczna aktualizacja bazy dziennej IMGW [$(date)]" && git push)
+
+        date_str=$(python -c 'from datetime import datetime; import zoneinfo; print(datetime.now(zoneinfo.ZoneInfo("Europe/Warsaw")).strftime("%Y-%m-%d"))')
+        dated_file="imgw_data/${date_str}.geojson"
+
+        if [ -f "imgw_data.geojson" ] && [ -f "imgw_data/dates.json" ] && [ -f "$dated_file" ]; then
+          git add imgw_data.geojson imgw_data/dates.json "$dated_file"
+          if ! git diff --cached --quiet; then
+            git commit -m "Aktualizacja bazy godzinowej IMGW: $(date +'%Y-%m-%d %H:%M')"
+            git push origin main
+          else
+            echo "Brak nowych danych do zapisania."
+          fi
+        else
+          echo "BÅ‚Ä…d: oczekiwane pliki nie powstaÅ‚y podczas dziaÅ‚ania skryptu Pythona."
+          echo "SprawdÅº, czy wygenerowano: imgw_data.geojson, imgw_data/dates.json, $dated_file"
+          exit 1
+        fi

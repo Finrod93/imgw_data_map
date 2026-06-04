@@ -14,15 +14,6 @@
             height: 100%;
             width: 100%;
             font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-        #map-wrapper {
-            position: relative;
-            flex: 1;
-            width: 100%;
-            height: 100%;
         }
         #map {
             height: 100%;
@@ -67,56 +58,59 @@
             text-decoration: none !important;
         }
 
-        /* STYLIZACJA WARSTW TEMPERATUROWYCH DLA JEZUSA CHRYSTUSA */
-        .leaflet-tooltip.stacja-etykieta {
-            background-color: transparent !important;
-            border: none !important;
-            box-shadow: none !important;
-            padding: 0 !important;
+        /* Standardowe parametry */
+        .opad-dobowy { background: rgba(255, 255, 255, 0.95) !important; border: 1px solid #4cd137 !important; padding: 0px 2px !important;}
+        .opad-10min { background: rgba(255, 255, 255, 0.95) !important; border: 1px solid #a3cb38 !important; padding: 0px 2px !important;}
+        .wiatr-avg { background: rgba(255, 255, 255, 0.95) !important; border: 1px solid #9980fa !important; padding: 0px 2px !important;}
+        .wiatr-max { background: rgba(255, 255, 255, 0.95) !important; border: 1px solid #52307c !important; padding: 0px 2px !important;}
+        .wysokosc { background: rgba(255, 255, 255, 0.95) !important; border: 1px solid #8d6e63 !important; padding: 0px 2px !important;}
+        .nazwa-stacji { background: rgba(255, 255, 255, 0.95) !important; border: 1px solid #b2bec3 !important; padding: 0px 2px !important;}
+
+        .leaflet-tooltip-top::before, 
+        .leaflet-tooltip-bottom::before, 
+        .leaflet-tooltip-left::before, 
+        .leaflet-tooltip-right::before {
+            display: none !important;
         }
 
-        /* RAMKI DLA INNYCH PARAMETRÓW */
-        .opad-dobowy, .opad-10min {
-            border: 1px solid #0055ff !important;
-            background-color: rgba(220, 235, 255, 0.95) !important;
-            padding: 1px 3px !important;
+        .leaflet-control-layers-separator {
+            border-top: 1px solid #ddd;
+            margin: 5px -10px 5px -10px;
         }
-        .wiatr-avg, .wiatr-max {
-            border: 1px solid #ffaa00 !important;
-            background-color: rgba(255, 250, 220, 0.95) !important;
-            padding: 1px 3px !important;
-        }
-        .wysokosc {
-            border: 1px solid #777777 !important;
-            background-color: rgba(240, 240, 240, 0.95) !important;
-            padding: 1px 3px !important;
-        }
-        .nazwa-stacji {
-            border: 1px solid #222222 !important;
-            background-color: rgba(255, 255, 255, 0.95) !important;
-            padding: 1px 3px !important;
-            font-weight: normal !important;
+        .leaflet-menu-section-title {
+            font-size: 11px;
+            color: #555;
+            font-weight: bold;
+            padding: 2px 0;
         }
 
-        /* CUSTOM CONTROLS LEAFLET */
+        /* SUWAK PRZEZROCZYSTOŚCI */
         .slider-opacity-container {
-            background: white;
+            background: rgba(255, 255, 255, 0.9);
             padding: 8px 12px;
             border-radius: 4px;
             box-shadow: 0 1px 5px rgba(0,0,0,0.4);
             font-size: 12px;
-        }
-        .slider-opacity-container label {
             font-weight: bold;
-            display: block;
-            margin-bottom: 4px;
+            color: #333;
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            min-width: 150px;
+        }
+        .slider-opacity-container input[type=range] {
+            cursor: pointer;
+            width: 100%;
+            margin: 0;
         }
 
+        /* PIONOWA LEGENDA */
         .map-legend-container {
-            background: white;
-            padding: 10px;
-            border-radius: 4px;
-            box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+            background: rgba(255, 255, 255, 0.92);
+            padding: 10px 14px;
+            border-radius: 5px;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.25);
             font-family: Arial, sans-serif;
             color: #2c3e50;
             min-width: 90px;
@@ -162,16 +156,6 @@
             font-size: 10px;
             font-weight: bold;
         }
-
-        .leaflet-menu-section-title {
-            font-weight: bold;
-            color: #2c3e50;
-            padding: 2px 0;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
         /* MINIMALISTYCZNA OŚ CZASU - SUBTELNA I SZEROKA */
         #timeline-container {
             position: absolute;
@@ -241,74 +225,31 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.3);
             transition: background 0.15s ease;
         }
-        .timeline-slider::-webkit-slider-thumb:hover {
-            background: #27ae60;
-        }
-        .timeline-slider::-moz-range-thumb {
-            width: 15px;
-            height: 15px;
-            border-radius: 50%;
-            background: #2ecc71;
-            cursor: pointer;
-            border: 2px solid #fff;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-            transition: background 0.15s ease;
-        }
-        .timeline-slider::-moz-range-thumb:hover {
-            background: #27ae60;
-        }
-        .timeline-ticks {
-            display: flex;
-            justify-content: space-between;
-            padding: 0 2px;
-        }
-        .timeline-tick-label {
-            font-size: 10px;
-            color: #7f8c8d;
-            position: relative;
-            text-align: center;
-            user-select: none;
-        }
-
-        /* STOPKA Z INFORMACJĄ O ŹRÓDLE */
-        #data-source-footer {
-            background: #f8f9fa;
-            border-top: 1px solid #e2e8f0;
-            text-align: center;
-            padding: 6px 10px;
-            font-size: 11px;
-            color: #64748b;
-            font-weight: 500;
-            z-index: 999;
-        }
+        .timeline-slider::-moz-range-thumb { width:15px; height:15px; border-radius:50%; background:#2ecc71; border:2px solid #fff; }
+        .timeline-ticks { display:flex; justify-content:space-between; padding:0 2px; }
+        .timeline-tick-label { font-size:10px; color:#7f8c8d; position:relative; text-align:center; user-select:none; }
     </style>
 </head>
 <body>
 
-    <div id="map-wrapper">
-        <div id="map"></div>
-        
-        <div id="timeline-container">
-            <div class="timeline-header">
-                <div class="timeline-controls">
-                    <span style="color:#2c3e50;">Wybór daty:</span>
+    <div id="map"></div>
+
+    <div id="timeline-container">
+        <div class="timeline-header">
+            <div class="timeline-controls">
+                <span style="color:#2c3e50;">Wybór daty:</span>
                     <input type="date" id="datePicker">
-                </div>
-                <div id="currentTimeLabel" style="font-size: 14px;">Godzina: <span style="color:#2ecc71; font-weight:bold;">12:00</span></div>
             </div>
-            <div class="slider-wrapper">
-                <input type="range" id="hourSlider" class="timeline-slider" min="0" max="23" value="12">
-                <div class="timeline-ticks" id="ticksContainer"></div>
-            </div>
+            <div id="currentTimeLabel" style="font-size: 14px;">Godzina: <span style="color:#2ecc71; font-weight:bold;">12:00</span></div>
+        </div>
+        <div class="slider-wrapper">
+            <input type="range" id="hourSlider" class="timeline-slider" min="0" max="23" value="12">
+            <div class="timeline-ticks" id="ticksContainer"></div>
         </div>
     </div>
 
-    <div id="data-source-footer">
-        Źródło danych: IMGW-PIB
-    </div>
-
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
     <script src="app.js"></script>
 </body>
 </html>
